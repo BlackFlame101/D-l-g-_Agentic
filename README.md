@@ -120,26 +120,6 @@ npm run dev:backend    # Start FastAPI dev server
 npm run dev:celery     # Start Celery worker
 ```
 
-## Supabase Project
-
-This project uses **DelegeDb** Supabase project:
-- **URL**: https://orckrnildvhujcaafdud.supabase.co
-- **Region**: eu-west-1
-
-Database schema will be set up in Phase 1.
-
-## Project Phases
-
-- [x] **Phase 0**: Project Setup
-- [ ] **Phase 1**: Supabase Database and Auth
-- [ ] **Phase 2**: WhatsApp Bridge
-- [ ] **Phase 3**: Backend Core
-- [ ] **Phase 4**: Frontend Landing Page
-- [ ] **Phase 5**: Frontend Dashboard
-- [ ] **Phase 6**: Manual Payments and Admin Panel
-- [ ] **Phase 7**: Testing and Hardening
-- [ ] **Phase 8**: Deployment
-- [ ] **Phase 9**: Launch
 
 ## License
 
