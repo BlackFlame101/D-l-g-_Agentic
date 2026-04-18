@@ -1,0 +1,197 @@
+"""Agno agent factory and message orchestration.
+
+This module owns the one place where we configure an :class:`agno.agent.Agent`
+for a given business. The agent is rebuilt per incoming message because the
+system prompt depends on the retrieved RAG chunks for that message. Agno is
+intentionally used in a stateless fashion - conversation history is persisted
+in Supabase and replayed here; we do not rely on Agno's session storage.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Optional
+
+from agno.agent import Agent, Message
+from agno.models.google import Gemini
+
+from core.config import settings
+from core.logging import get_logger
+from services.gemini import approximate_token_count
+from services.rag import RetrievedChunk, format_chunks_for_prompt
+
+logger = get_logger(__name__)
+
+
+LANGUAGE_INSTRUCTIONS = {
+    "ar": "Respond in Moroccan Arabic (Darija) when the user writes in Arabic. Use simple, friendly language.",
+    "fr": "Respond in French when the user writes in French. Keep the tone polite and professional.",
+    "en": "Respond in English when the user writes in English.",
+}
+
+
+@dataclass(frozen=True)
+class HistoryMessage:
+    """A persisted message pulled from Supabase, replayed into the agent."""
+
+    role: str  # "user" | "assistant"
+    content: str
+
+
+@dataclass(frozen=True)
+class AgentReply:
+    """What the message pipeline gets back from the agent."""
+
+    content: str
+    tokens_used: int
+    input_tokens: int
+    output_tokens: int
+    used_fallback: bool = False
+
+
+def _build_system_prompt(
+    agent_row: dict,
+    chunks: List[RetrievedChunk],
+) -> str:
+    """Compose a system prompt from the agent's config + retrieved knowledge."""
+    parts: list[str] = []
+
+    base_prompt = (agent_row.get("system_prompt") or "").strip()
+    if base_prompt:
+        parts.append(base_prompt)
+    else:
+        parts.append(
+            "You are a helpful WhatsApp assistant for a business. "
+            "Answer customer questions clearly and briefly."
+        )
+
+    name = (agent_row.get("name") or "").strip()
+    if name:
+        parts.append(f"Your name is {name}.")
+
+    tone = (agent_row.get("tone") or "").strip()
+    if tone:
+        parts.append(f"Adopt a {tone} tone.")
+
+    language = (agent_row.get("language") or "").strip().lower()
+    if language:
+        instruction = LANGUAGE_INSTRUCTIONS.get(language)
+        if instruction:
+            parts.append(instruction)
+        else:
+            parts.append(
+                "Match the customer's language automatically. "
+                "Support Moroccan Arabic (Darija), French and English."
+            )
+    else:
+        parts.append(
+            "Match the customer's language automatically. "
+            "Support Moroccan Arabic (Darija), French and English."
+        )
+
+    parts.append(
+        "You are chatting on WhatsApp. Keep replies short (1-4 short paragraphs max), "
+        "plain text, no markdown headings. Avoid emojis unless the user uses them first."
+    )
+
+    rag_block = format_chunks_for_prompt(chunks)
+    if rag_block:
+        parts.append(rag_block)
+        parts.append(
+            "If the excerpts above don't answer the question, say that you'll "
+            "check with the team and offer to take a message - don't invent facts."
+        )
+
+    return "\n\n".join(parts)
+
+
+def _build_agent(system_prompt: str) -> Agent:
+    model = Gemini(id=settings.gemini_model, api_key=settings.google_api_key)
+    return Agent(
+        model=model,
+        system_message=system_prompt,
+        markdown=False,
+        telemetry=False,
+    )
+
+
+def _build_input_messages(
+    history: List[HistoryMessage],
+    user_message: str,
+) -> List[Message]:
+    """Turn stored history + the new user turn into an Agno messages list."""
+    messages: List[Message] = []
+    for item in history:
+        role = item.role if item.role in ("user", "assistant", "system") else "user"
+        messages.append(Message(role=role, content=item.content))
+    messages.append(Message(role="user", content=user_message))
+    return messages
+
+
+def generate_reply(
+    agent_row: dict,
+    user_message: str,
+    chunks: List[RetrievedChunk],
+    history: List[HistoryMessage],
+    fallback_message: Optional[str] = None,
+) -> AgentReply:
+    """Run the Agno agent and return a structured reply.
+
+    If Agno raises or produces empty content, returns the configured
+    ``fallback_message`` (or a generic fallback) with ``used_fallback=True``.
+    """
+    system_prompt = _build_system_prompt(agent_row, chunks)
+    fallback = (
+        fallback_message
+        or agent_row.get("fallback_message")
+        or "Sorry, I'm having trouble answering right now. I'll get back to you shortly."
+    )
+
+    try:
+        agent = _build_agent(system_prompt)
+        input_messages = _build_input_messages(history, user_message)
+        result = agent.run(input=input_messages)
+    except Exception as exc:
+        logger.exception("Agno agent run failed", extra={"error": str(exc)})
+        return AgentReply(
+            content=fallback,
+            tokens_used=approximate_token_count(fallback),
+            input_tokens=0,
+            output_tokens=0,
+            used_fallback=True,
+        )
+
+    content = result.content if result and result.content else ""
+    if isinstance(content, list):
+        content = "\n".join(str(c) for c in content)
+    content = (content or "").strip()
+
+    if not content:
+        logger.warning("Agno returned empty content; using fallback")
+        return AgentReply(
+            content=fallback,
+            tokens_used=approximate_token_count(fallback),
+            input_tokens=0,
+            output_tokens=0,
+            used_fallback=True,
+        )
+
+    input_tokens = 0
+    output_tokens = 0
+    total_tokens = 0
+    metrics = getattr(result, "metrics", None)
+    if metrics is not None:
+        input_tokens = int(getattr(metrics, "input_tokens", 0) or 0)
+        output_tokens = int(getattr(metrics, "output_tokens", 0) or 0)
+        total_tokens = int(getattr(metrics, "total_tokens", 0) or 0)
+
+    if total_tokens <= 0:
+        total_tokens = approximate_token_count(user_message) + approximate_token_count(content)
+
+    return AgentReply(
+        content=content,
+        tokens_used=total_tokens,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        used_fallback=False,
+    )

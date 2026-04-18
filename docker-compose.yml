@@ -1,0 +1,29 @@
+# Delege Local Development Services
+# 
+# Usage:
+#   docker-compose up        - Start all services
+#   docker-compose up -d     - Start in background (detached)
+#   docker-compose down      - Stop all services
+#   docker-compose logs -f   - View logs
+
+version: '3.8'
+
+services:
+  # Redis for Celery task queue and caching
+  redis:
+    image: redis:7-alpine
+    container_name: delege-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis_data:
+    driver: local

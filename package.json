@@ -1,0 +1,22 @@
+{
+  "name": "delege",
+  "version": "0.1.0",
+  "description": "Agentic WhatsApp Platform for Moroccan/MENA businesses",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:bridge": "cd whatsapp-bridge && npm run dev",
+    "dev:backend": "cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:celery": "cd backend && celery -A celery_app worker --loglevel=info",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "install:frontend": "cd frontend && npm install",
+    "install:bridge": "cd whatsapp-bridge && npm install",
+    "install:backend": "cd backend && pip install -r requirements.txt",
+    "install:all": "npm run install:frontend && npm run install:bridge"
+  },
+  "keywords": ["whatsapp", "ai", "agent", "morocco", "mena"],
+  "author": "",
+  "license": "ISC"
+}

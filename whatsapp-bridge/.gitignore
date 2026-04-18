@@ -1,0 +1,27 @@
+# Node.js WhatsApp Bridge .gitignore
+
+# Environment
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# Baileys auth sessions (contains sensitive credentials!)
+auth_info_baileys/
+sessions/
+*.json.bak
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
