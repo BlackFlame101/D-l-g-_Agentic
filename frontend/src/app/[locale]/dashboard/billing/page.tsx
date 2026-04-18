@@ -1,0 +1,300 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useUser } from "@/hooks/use-user";
+import { createClient } from "@/lib/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  CreditCard,
+  Calendar,
+  MessageSquare,
+  ExternalLink,
+  Building2,
+  Phone,
+  Copy,
+  CheckCircle2,
+} from "lucide-react";
+import { toast } from "sonner";
+
+interface Subscription {
+  id: string;
+  status: string;
+  message_limit: number;
+  current_usage: number;
+  payment_method: string | null;
+  payment_reference: string | null;
+  created_at: string;
+  expires_at: string | null;
+}
+
+interface Plan {
+  id: string;
+  name: string;
+  message_limit: number;
+  price_mad: number;
+  features: string[];
+}
+
+export default function BillingPage() {
+  const t = useTranslations("Dashboard");
+  const { user } = useUser();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    loadBilling();
+  }, [user]);
+
+  async function loadBilling() {
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("*, plans(*)")
+        .eq("user_id", user!.id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (sub) {
+        setSubscription(sub);
+        if (sub.plans) setPlan(sub.plans);
+      }
+    } catch {
+      // empty state
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function copyToClipboard(text: string, key: string) {
+    navigator.clipboard.writeText(text);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
+    toast.success(t("billing.copied"));
+  }
+
+  const usagePercent = subscription
+    ? Math.min(
+        Math.round(
+          (subscription.current_usage / subscription.message_limit) * 100
+        ),
+        100
+      )
+    : 0;
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6">
+        <Skeleton className="h-8 w-48" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i}>
+            <CardContent className="pt-6">
+              <Skeleton className="h-20 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
+        <h1 className="font-heading text-xl font-bold text-foreground">
+          {t("billing.title")}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {t("billing.description")}
+        </p>
+      </div>
+
+      {/* Current plan */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-secondary" />
+            {t("billing.currentPlan")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {subscription ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-heading text-lg font-bold text-foreground">
+                    {plan?.name || t("billing.standardPlan")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {plan
+                      ? `${plan.price_mad} MAD/${t("billing.perMonth")}`
+                      : ""}
+                  </p>
+                </div>
+                <Badge
+                  className={
+                    subscription.status === "active"
+                      ? "bg-chart-3/20 text-chart-3"
+                      : "bg-chart-1/20 text-chart-1"
+                  }
+                >
+                  {subscription.status === "active"
+                    ? t("billing.active")
+                    : subscription.status}
+                </Badge>
+              </div>
+              {subscription.expires_at && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  {t("billing.expiresOn")}{" "}
+                  {new Date(subscription.expires_at).toLocaleDateString()}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-sm text-muted-foreground">
+                {t("billing.noPlan")}
+              </p>
+              <Button className="mt-3 gap-2">
+                <Phone className="h-4 w-4" />
+                {t("billing.contactWhatsApp")}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Usage */}
+      {subscription && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-secondary" />
+              {t("billing.usage")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {t("billing.messagesUsed")}
+              </span>
+              <span className="font-medium text-foreground">
+                {subscription.current_usage} / {subscription.message_limit}
+              </span>
+            </div>
+            <Progress value={usagePercent} className="h-3" />
+            <p className="text-xs text-muted-foreground">
+              {usagePercent}% {t("billing.ofQuota")}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payment instructions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("billing.paymentMethods")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {t("billing.paymentInstructions")}
+          </p>
+
+          <div className="space-y-3">
+            <PaymentMethod
+              icon={<Building2 className="h-5 w-5" />}
+              title={t("billing.bankTransfer")}
+              details={[
+                { label: "RIB", value: "XXX XXXX XXXX XXXX XXXX XX" },
+                {
+                  label: t("billing.beneficiary"),
+                  value: "Déléguè SARL",
+                },
+              ]}
+              copied={copied}
+              onCopy={copyToClipboard}
+            />
+            <PaymentMethod
+              icon={<Phone className="h-5 w-5" />}
+              title="CashPlus"
+              details={[
+                {
+                  label: t("billing.transferTo"),
+                  value: "+212 6XX XXX XXX",
+                },
+              ]}
+              copied={copied}
+              onCopy={copyToClipboard}
+            />
+          </div>
+
+          <div className="rounded-lg bg-primary/10 p-4 text-sm text-foreground">
+            <p className="font-medium">{t("billing.afterPayment")}</p>
+            <p className="mt-1 text-muted-foreground">
+              {t("billing.afterPaymentDesc")}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function PaymentMethod({
+  icon,
+  title,
+  details,
+  copied,
+  onCopy,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  details: { label: string; value: string }[];
+  copied: string | null;
+  onCopy: (text: string, key: string) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="flex items-center gap-2 text-foreground">
+        {icon}
+        <span className="font-medium">{title}</span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {details.map((d) => (
+          <div
+            key={d.label}
+            className="flex items-center justify-between text-sm"
+          >
+            <span className="text-muted-foreground">{d.label}:</span>
+            <div className="flex items-center gap-2">
+              <code className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">
+                {d.value}
+              </code>
+              <button
+                onClick={() => onCopy(d.value, d.label)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                {copied === d.label ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-chart-3" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
