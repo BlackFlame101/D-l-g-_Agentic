@@ -42,28 +42,10 @@
     "subtitle": "Choose the plan that fits your business size.",
     "popular": "POPULAR",
     "perMonth": "MAD/month",
-    "starterName": "Starter",
-    "starterDesc": "For small businesses",
-    "starterPrice": "299",
-    "starterFeature1": "Up to 500 conversations/month",
-    "starterFeature2": "Darija & French support",
-    "starterFeature3": "1 WhatsApp AI Agent",
-    "starterCta": "Choose Starter",
-    "proName": "Pro",
-    "proDesc": "Best value for your money",
-    "proPrice": "599",
-    "proFeature1": "Unlimited conversations",
-    "proFeature2": "Basic CRM Integration",
-    "proFeature3": "Advanced Analytics Dashboard",
-    "proFeature4": "24/7 Priority Support",
-    "proCta": "Choose Pro",
-    "businessName": "Business",
-    "businessDesc": "For large businesses",
-    "businessPrice": "999",
-    "businessFeature1": "Multi-number WhatsApp",
-    "businessFeature2": "Custom API & Webhooks",
-    "businessFeature3": "Dedicated Account Manager",
-    "businessCta": "Choose Business"
+    "messageSuffix": "messages/month",
+    "ctaContact": "Contact us on WhatsApp",
+    "noPlans": "No plans available right now.",
+    "contactMessage": "Hi, I'd like to subscribe to the {plan} plan on Déléguè."
   },
   "FAQ": {
     "title": "Frequently Asked Questions",
@@ -281,7 +263,12 @@
       "transferTo": "Transfer to",
       "afterPayment": "After Payment",
       "afterPaymentDesc": "Send your payment receipt via WhatsApp and we'll activate your subscription within a few hours.",
-      "copied": "Copied to clipboard!"
+      "copied": "Copied to clipboard!",
+      "expiringSoonTitle": "Your subscription expires in {days} day(s)",
+      "expiringSoonDesc": "Renew now to avoid any service interruption.",
+      "renewNow": "Renew",
+      "whatsappRenewMessage": "Hi, I'd like to renew my {plan} subscription on Déléguè.",
+      "whatsappContactMessage": "Hi, I'd like to subscribe on Déléguè."
     },
     "settings": {
       "title": "Settings",
@@ -319,6 +306,105 @@
       "saveProfile": "Failed to update profile.",
       "changePassword": "Failed to change password.",
       "deleteAccount": "Failed to delete account."
+    }
+  },
+  "Admin": {
+    "title": "Admin",
+    "backToApp": "Back to app",
+    "nav": {
+      "overview": "Overview",
+      "users": "Users",
+      "subscriptions": "Subscriptions"
+    },
+    "home": {
+      "title": "Admin dashboard",
+      "subtitle": "Track customers, subscriptions and usage.",
+      "manageUsers": "Manage users"
+    },
+    "stats": {
+      "totalUsers": "Total users",
+      "activeSubs": "Active subscriptions",
+      "pendingSubs": "Pending",
+      "pendingHint": "Signed up without an active plan",
+      "expiringSoon": "Expiring soon",
+      "expiringHint": "In the next 7 days",
+      "messages30d": "Messages (30d)",
+      "mrr": "Estimated MRR",
+      "mrrHint": "Sum of active plans"
+    },
+    "status": {
+      "none": "None",
+      "pending": "Pending",
+      "active": "Active",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    },
+    "users": {
+      "title": "Users",
+      "subtitle": "All users registered on Delege.",
+      "searchPlaceholder": "Search by name, company or phone...",
+      "filterAll": "All statuses",
+      "filterNone": "Without subscription",
+      "empty": "No users found.",
+      "messages30d": "{count, plural, =0 {0 messages} one {# message} other {# messages}} (30d)",
+      "showing": "Showing {from}-{to}",
+      "prev": "Previous",
+      "next": "Next"
+    },
+    "user": {
+      "backToUsers": "Back to users",
+      "activatePlan": "Activate plan",
+      "profile": "Profile",
+      "phone": "Phone",
+      "language": "Language",
+      "signedUp": "Signed up",
+      "lastSignIn": "Last sign-in",
+      "usage30d": "Usage (last 30 days)",
+      "messages": "messages",
+      "noUsage": "No recorded usage.",
+      "subscriptionsTitle": "Subscription history",
+      "noSubscriptions": "No subscriptions.",
+      "msgLimit": "messages/month",
+      "used": "used",
+      "created": "Created",
+      "expires": "expires",
+      "payRef": "Payment ref",
+      "cancel": "Cancel",
+      "confirmCancel": "Cancel this subscription?",
+      "cancelled": "Subscription cancelled.",
+      "activated": "Subscription activated!"
+    },
+    "subscriptions": {
+      "title": "Active subscriptions",
+      "subtitle": "Users with an active subscription.",
+      "empty": "No active subscriptions yet.",
+      "expires": "expires"
+    },
+    "activate": {
+      "title": "Activate subscription",
+      "description": "Activate a new plan for {name}. Any existing subscription will be cancelled.",
+      "plan": "Plan",
+      "noPlans": "No plans available.",
+      "method": "Payment method",
+      "bankTransfer": "Bank transfer",
+      "cashplus": "CashPlus",
+      "cash": "Cash",
+      "reference": "Payment reference",
+      "referencePlaceholder": "e.g. TX-12345",
+      "optional": "optional",
+      "expiresAt": "Expiry date",
+      "submit": "Activate",
+      "submitting": "Activating...",
+      "cancel": "Cancel"
+    },
+    "errors": {
+      "loadStats": "Failed to load stats.",
+      "loadUsers": "Failed to load users.",
+      "loadUser": "Failed to load user.",
+      "userNotFound": "User not found.",
+      "loadPlans": "Failed to load plans.",
+      "activateSubscription": "Failed to activate subscription.",
+      "cancelSubscription": "Failed to cancel subscription."
     }
   },
   "Privacy": {

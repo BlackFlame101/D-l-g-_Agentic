@@ -11,6 +11,66 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import { config } from './config.js';
 import { logger, createSessionLogger } from './logger.js';
+
+// Cache the live WA-Web version so we don't hammer web.whatsapp.com on every
+// reconnect. Refresh at most once every 30 min.
+let _waVersionCache = { value: null, fetchedAt: 0 };
+const WA_VERSION_TTL_MS = 30 * 60 * 1000;
+
+/**
+ * Fetch the live WhatsApp Web build from the public service worker bundle so
+ * the Baileys handshake matches a version WA actually accepts. The Baileys
+ * bundled default (via `fetchLatestBaileysVersion`) goes stale quickly and
+ * causes HTTP 405 "Connection Failure" loops — which is exactly the QR-never-
+ * appears symptom. We fall back to the Baileys default if the scrape fails.
+ *
+ * @returns {Promise<{version: number[], isLatest: boolean, source: string}>}
+ */
+async function resolveWaWebVersion() {
+  if (
+    _waVersionCache.value &&
+    Date.now() - _waVersionCache.fetchedAt < WA_VERSION_TTL_MS
+  ) {
+    return { ..._waVersionCache.value, source: 'cache' };
+  }
+
+  try {
+    const res = await fetch('https://web.whatsapp.com/sw.js', {
+      headers: { 'user-agent': 'Mozilla/5.0 (Delege-Bridge)' },
+    });
+    if (res.ok) {
+      const body = await res.text();
+      // Look for the revision number WA Web ships. The sw.js bundle wraps
+      // the manifest in `self.__swData = JSON.parse("...")`, so the key comes
+      // through as an *escaped* JSON string (\"client_revision\":1037662086).
+      // Accept both the escaped and legacy bare forms. Prefer `client_revision`
+      // but fall back to `server_revision` which WA ships alongside it.
+      const m =
+        body.match(/\\?"client_revision\\?"\s*:\s*(\d{6,})/) ||
+        body.match(/\\?"server_revision\\?"\s*:\s*(\d{6,})/);
+      if (m) {
+        const live = [2, 3000, parseInt(m[1], 10)];
+        _waVersionCache = {
+          value: { version: live, isLatest: true },
+          fetchedAt: Date.now(),
+        };
+        return { version: live, isLatest: true, source: 'web.whatsapp.com' };
+      }
+    }
+    logger.warn({ status: res.status }, 'sw.js returned no client_revision, falling back');
+  } catch (err) {
+    logger.warn({ err: String(err) }, 'Failed to scrape web.whatsapp.com/sw.js');
+  }
+
+  // Fallback: Baileys' own helper (may be stale, but better than failing).
+  try {
+    const r = await fetchLatestBaileysVersion();
+    return { version: r.version, isLatest: !!r.isLatest, source: 'baileys-master' };
+  } catch (err) {
+    logger.warn({ err: String(err) }, 'fetchLatestBaileysVersion failed');
+    return { version: [2, 3000, 1035194821], isLatest: false, source: 'hardcoded-fallback' };
+  }
+}
 import {
   loadSessionFromDb,
   saveSessionToDb,
@@ -38,11 +98,21 @@ const reconnectAttempts = new Map(); // Track reconnection attempts
  */
 
 /**
- * Create or get existing session
+ * Create or get existing session.
+ *
+ * When called as part of an automatic reconnect (e.g. after WhatsApp's
+ * post-pairing `code: 515 — restart required` stream error), we MUST reuse
+ * the in-memory auth state of the previous socket instead of wiping it.
+ * Otherwise `socket.logout()` invalidates the just-paired device and Baileys
+ * starts a fresh QR flow — the phone then reports "Check your internet
+ * connection" because WhatsApp thinks the device we're trying to pair to
+ * is already logged out.
  */
-export async function createSession(userId) {
+export async function createSession(userId, { preserveAuth = false } = {}) {
   const log = createSessionLogger(userId);
   
+  let preservedAuthState = null;
+
   // Check if session already exists
   if (sessions.has(userId)) {
     const existing = sessions.get(userId);
@@ -50,31 +120,41 @@ export async function createSession(userId) {
       log.info('Session already connected');
       return { success: true, status: 'connected' };
     }
-    // Clean up existing session
-    await destroySession(userId, false);
+    // Clean up existing session. If this is a reconnect path, keep the
+    // in-memory auth state and skip the WA-facing `logout()` call.
+    if (preserveAuth) {
+      preservedAuthState = existing.authState;
+    }
+    await destroySession(userId, { updateDb: false, logout: !preserveAuth });
   }
   
-  log.info('Creating new session');
+  log.info({ preserveAuth }, 'Creating new session');
   
   try {
     // Create session record in DB
     await createSessionRecord(userId);
     
     // Check for existing credentials in DB
-    const dbSession = await loadSessionFromDb(userId);
     let initialAuthState = null;
-    
-    if (dbSession?.session_data) {
-      log.info('Found existing credentials, attempting to restore');
-      initialAuthState = deserializeAuthState(dbSession.session_data);
+    if (preservedAuthState) {
+      initialAuthState = preservedAuthState.getSerializedState();
+      log.info('Reusing in-memory credentials from previous socket');
+    } else {
+      const dbSession = await loadSessionFromDb(userId);
+      if (dbSession?.session_data) {
+        log.info('Found existing credentials in DB, attempting to restore');
+        initialAuthState = deserializeAuthState(dbSession.session_data);
+      }
     }
     
     // Create auth state
     const authState = useMemoryAuthState(initialAuthState);
     
-    // Get latest Baileys version
-    const { version, isLatest } = await fetchLatestBaileysVersion();
-    log.info({ version, isLatest }, 'Using Baileys version');
+    // Get the live WhatsApp Web version. The Baileys-bundled default goes
+    // stale within weeks and causes WA to respond with HTTP 405 / "Connection
+    // Failure" — the QR-never-appears symptom.
+    const { version, isLatest, source } = await resolveWaWebVersion();
+    log.info({ version, isLatest, source }, 'Using WhatsApp Web version');
     
     // Create socket
     const socket = makeWASocket({
@@ -99,6 +179,11 @@ export async function createSession(userId) {
       authState,
       createdAt: new Date(),
       connectedAt: null,
+      // Latest QR string emitted by Baileys. Cached so a WebSocket client that
+      // connects *after* the QR was generated (e.g. session started by the
+      // backend or via HTTP POST /start) still receives it instead of sitting
+      // on an empty `qr_pending` screen forever.
+      lastQr: null,
     };
     sessions.set(userId, session);
     
@@ -128,6 +213,7 @@ function setupEventHandlers(userId, socket, authState) {
       const session = sessions.get(userId);
       if (session) {
         session.status = 'qr_pending';
+        session.lastQr = qr;
       }
       
       // Update DB
@@ -179,6 +265,7 @@ function setupEventHandlers(userId, socket, authState) {
       
       if (session) {
         session.status = 'disconnected';
+        session.lastQr = null;
       }
       
       if (statusCode === DisconnectReason.loggedOut) {
@@ -193,8 +280,14 @@ function setupEventHandlers(userId, socket, authState) {
           message: 'WhatsApp logged out. Please scan QR code again.',
         });
       } else if (shouldReconnect) {
-        // Attempt reconnection with exponential backoff
-        await handleReconnect(userId);
+        // Attempt reconnection with exponential backoff. For the
+        // post-pairing "restart required" (statusCode 515) we MUST reuse the
+        // in-memory auth state: Baileys emits this right after a successful
+        // QR scan to force a fresh socket, and throwing away the creds here
+        // would drop us back to the QR screen with the phone showing "Check
+        // your internet connection". For other transient errors, reusing
+        // the existing authState is also harmless and slightly faster.
+        await handleReconnect(userId, { preserveAuth: true });
       } else {
         await updateSessionStatus(userId, 'disconnected');
         
@@ -220,20 +313,33 @@ function setupEventHandlers(userId, socket, authState) {
     }
   });
   
-  // Credentials update
-  socket.ev.on('creds.update', async (creds) => {
-    authState.updateCreds(creds);
-    
-    // Save to DB
+  // Credentials update. Persist on *every* update, not just once the session
+  // reaches `connected`. After a successful QR scan WhatsApp issues a
+  // `code: 515 — restart required` that closes the stream before we ever
+  // reach `connected`; if we hadn't saved the freshly-paired creds by then,
+  // the reconnect path can't recover them and we'd regress into a new QR
+  // prompt (with the phone showing "Check your internet connection" because
+  // it has already handed over pairing to a device that now looks gone).
+  //
+  // The event payload is a *partial* creds patch (see
+  // `'creds.update': Partial<AuthenticationCreds>` in baileys' Events typings).
+  // We do NOT need to merge it ourselves — baileys registers its own
+  // `creds.update` listener first which does `Object.assign(creds, update)` on
+  // the same `authState.creds` reference we passed in. By the time this
+  // handler fires, `authState.state.creds` already holds the merged, complete
+  // creds object. All we need to do here is persist it.
+  socket.ev.on('creds.update', async () => {
     const session = sessions.get(userId);
-    if (session && session.status === 'connected') {
-      const serializedState = authState.getSerializedState();
+    if (!session) return;
+    try {
       await saveSessionToDb(
         userId,
-        serializedState,
+        authState.getSerializedState(),
         session.phoneNumber,
         session.status
       );
+    } catch (err) {
+      logger.error({ userId, err: err.message }, 'Failed to persist creds update');
     }
   });
   
@@ -404,9 +510,14 @@ export async function sendMessage(userId, to, text) {
 }
 
 /**
- * Handle reconnection with exponential backoff
+ * Handle reconnection with exponential backoff.
+ *
+ * @param {string} userId
+ * @param {{ preserveAuth?: boolean }} [opts] preserveAuth=true keeps the
+ *   in-memory credentials alive through the restart (required after the
+ *   post-pairing stream-error 515 and safe for any transient WA close).
  */
-async function handleReconnect(userId) {
+async function handleReconnect(userId, { preserveAuth = false } = {}) {
   const log = createSessionLogger(userId);
   
   const attempts = reconnectAttempts.get(userId) || 0;
@@ -445,24 +556,41 @@ async function handleReconnect(userId) {
   setTimeout(async () => {
     const session = sessions.get(userId);
     if (session && session.status === 'disconnected') {
-      log.info({ attempt: attempts + 1 }, 'Attempting reconnection');
-      await createSession(userId);
+      log.info({ attempt: attempts + 1, preserveAuth }, 'Attempting reconnection');
+      await createSession(userId, { preserveAuth });
     }
   }, delay);
 }
 
 /**
- * Destroy a session
+ * Destroy a session.
+ *
+ * `opts.logout` controls whether we actively tell WhatsApp that this device
+ * wants to log out. Must be `false` on auto-reconnect paths (post-pairing
+ * 515 restart, transient network errors, …) — otherwise WA invalidates the
+ * device we just paired and the phone reports "Check your internet
+ * connection" on the next pairing attempt.
+ *
+ * Legacy boolean signature (`destroySession(userId, false)`) is still
+ * supported and maps to `{ updateDb: false, logout: true }` for backward
+ * compatibility with any external callers.
  */
-export async function destroySession(userId, updateDb = true) {
+export async function destroySession(userId, opts = true) {
   const log = createSessionLogger(userId);
   const session = sessions.get(userId);
+
+  const { updateDb, logout } =
+    typeof opts === 'boolean'
+      ? { updateDb: opts, logout: true }
+      : { updateDb: opts.updateDb !== false, logout: opts.logout !== false };
   
   if (session) {
-    try {
-      await session.socket.logout();
-    } catch (error) {
-      // Ignore logout errors
+    if (logout) {
+      try {
+        await session.socket.logout();
+      } catch (error) {
+        // Ignore logout errors
+      }
     }
     
     try {
@@ -472,14 +600,21 @@ export async function destroySession(userId, updateDb = true) {
     }
     
     sessions.delete(userId);
-    log.info('Session destroyed');
+    log.info({ logout }, 'Session destroyed');
   }
   
   if (updateDb) {
     await deleteSessionFromDb(userId);
   }
-  
-  reconnectAttempts.delete(userId);
+
+  // Only reset the reconnect attempt counter on *manual* teardown (when we
+  // also clear DB state). When destroySession is called from inside
+  // createSession's "already-exists" cleanup path (updateDb=false), keep the
+  // counter so the exponential backoff actually grows and we give up instead
+  // of looping at attempt 1 forever on persistent WA failures.
+  if (updateDb) {
+    reconnectAttempts.delete(userId);
+  }
   
   sendToClient(userId, {
     type: 'disconnected',
@@ -507,6 +642,10 @@ export function getSessionStatus(userId) {
     phoneNumber: session.phoneNumber,
     connectedAt: session.connectedAt?.toISOString() || null,
     createdAt: session.createdAt.toISOString(),
+    // Expose the cached QR string so the QR WS handler can resend it to
+    // late-joining clients. Cleared once the session reaches `connected`
+    // or `disconnected`.
+    qr: session.status === 'qr_pending' ? (session.lastQr || null) : null,
   };
 }
 
@@ -546,12 +685,37 @@ export function unregisterWsClient(userId) {
 
 /**
  * Send message to WebSocket client
+ *
+ * Normalizes the payload so both the legacy dashboard (type-based) and the
+ * frontend QR page (status + phone_number) can read from the same frame.
  */
 function sendToClient(userId, message) {
   const ws = wsClients.get(userId);
-  
-  if (ws && ws.readyState === 1) { // WebSocket.OPEN
-    ws.send(JSON.stringify(message));
+
+  if (!(ws && ws.readyState === 1)) return; // WebSocket.OPEN
+
+  const normalized = { ...message };
+  // Map `type` -> `status` for frontend-friendly consumption.
+  const typeToStatus = {
+    connected: 'connected',
+    connecting: 'connecting',
+    disconnected: 'disconnected',
+    qr: 'qr_pending',
+    session_starting: message.status,
+    session_status: message.status,
+  };
+  if (normalized.status === undefined && typeToStatus[message.type] !== undefined) {
+    normalized.status = typeToStatus[message.type];
+  }
+  // Snake-case phone number for the frontend
+  if (normalized.phone_number === undefined && normalized.phoneNumber !== undefined) {
+    normalized.phone_number = normalized.phoneNumber;
+  }
+
+  try {
+    ws.send(JSON.stringify(normalized));
+  } catch (err) {
+    logger.error({ userId, err: err.message }, 'Failed to send WS frame');
   }
 }
 

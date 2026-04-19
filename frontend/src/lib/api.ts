@@ -1,7 +1,28 @@
 import { createClient } from "@/lib/supabase/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001/ws";
+// Bridge HTTP base URL (e.g. http://localhost:3001). Separated from the WS URL
+// so we don't have to string-swap schemes / paths at call sites.
+const BRIDGE_HTTP_URL =
+  process.env.NEXT_PUBLIC_BRIDGE_URL || "http://localhost:3001";
+// WebSocket base URL for the bridge. Derived from BRIDGE_HTTP_URL by default
+// so local dev "just works" without extra env plumbing.
+const BRIDGE_WS_URL =
+  process.env.NEXT_PUBLIC_BRIDGE_WS_URL ||
+  process.env.NEXT_PUBLIC_WS_URL?.replace(/\/ws\/?$/, "") ||
+  BRIDGE_HTTP_URL.replace(/^http/, "ws");
+// Shared secret used for the bridge's X-API-Secret header. In production this
+// should only be non-empty when the bridge is deployed behind a private
+// network or the value is rotated frequently (Phase 7.10 hardening review).
+const BRIDGE_API_SECRET = process.env.NEXT_PUBLIC_BRIDGE_API_SECRET || "";
+
+function bridgeHeaders(extra: HeadersInit = {}): HeadersInit {
+  const headers: Record<string, string> = { ...(extra as Record<string, string>) };
+  if (BRIDGE_API_SECRET) {
+    headers["X-API-Secret"] = BRIDGE_API_SECRET;
+  }
+  return headers;
+}
 
 async function getAuthHeaders(): Promise<HeadersInit> {
   const supabase = createClient();
@@ -165,25 +186,30 @@ export const conversationsApi = {
 
 // -- WhatsApp Bridge --
 export function getWhatsAppQrWsUrl(userId: string): string {
-  return `${WS_URL.replace("/ws", "")}/api/session/${userId}/qr`;
+  // Append apiSecret as a query param so the browser WebSocket (which can't
+  // send custom headers) can still authenticate with the bridge.
+  const base = BRIDGE_WS_URL.replace(/\/$/, "");
+  const qs = BRIDGE_API_SECRET
+    ? `?apiSecret=${encodeURIComponent(BRIDGE_API_SECRET)}`
+    : "";
+  return `${base}/api/session/${encodeURIComponent(userId)}/qr${qs}`;
 }
 
 export async function getWhatsAppStatus(
   userId: string
 ): Promise<{ status: string; phone_number?: string }> {
   const res = await fetch(
-    `${WS_URL.replace("ws://", "http://").replace("wss://", "https://").replace("/ws", "")}/api/session/${userId}/status`
+    `${BRIDGE_HTTP_URL.replace(/\/$/, "")}/api/session/${encodeURIComponent(userId)}/status`,
+    { headers: bridgeHeaders() }
   );
   if (!res.ok) throw new Error("Failed to get WhatsApp status");
   return res.json();
 }
 
 export async function disconnectWhatsApp(userId: string): Promise<void> {
-  const baseUrl = WS_URL.replace("ws://", "http://")
-    .replace("wss://", "https://")
-    .replace("/ws", "");
-  const res = await fetch(`${baseUrl}/api/session/${userId}/disconnect`, {
-    method: "POST",
-  });
+  const res = await fetch(
+    `${BRIDGE_HTTP_URL.replace(/\/$/, "")}/api/session/${encodeURIComponent(userId)}/disconnect`,
+    { method: "POST", headers: bridgeHeaders() }
+  );
   if (!res.ok) throw new Error("Failed to disconnect WhatsApp");
 }

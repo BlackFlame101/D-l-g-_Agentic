@@ -15,6 +15,7 @@
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
+import { URL } from 'url';
 import { config, validateConfig } from './config.js';
 import { logger } from './logger.js';
 import { initRedis, closeRedis } from './rate-limiter.js';
@@ -40,6 +41,53 @@ try {
 
 const app = express();
 app.use(express.json());
+
+// CORS middleware. The frontend hits this bridge directly from the browser
+// (WhatsApp QR + status endpoints), which triggers a preflight because we
+// send the custom `X-API-Secret` header. Without explicit CORS headers the
+// browser blocks the request before it ever reaches our auth middleware.
+function corsMiddleware(req, res, next) {
+  const origin = req.headers.origin;
+  const allow = config.corsOrigins;
+  const isAllowed =
+    allow.includes('*') ||
+    (origin && allow.includes(origin));
+
+  if (isAllowed && origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  } else if (allow.includes('*')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else if (origin) {
+    // In development, auto-allow localhost/127.0.0.1 on any port for
+    // convenience (e.g. Next.js dev server occasionally picks a non-3000
+    // port). Never enabled in production.
+    const isLocalhost =
+      process.env.NODE_ENV !== 'production' &&
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+    if (isLocalhost) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'GET,POST,PUT,PATCH,DELETE,OPTIONS'
+  );
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type,Authorization,X-API-Secret,X-Requested-With'
+  );
+  res.setHeader('Access-Control-Max-Age', '600');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+}
+
+app.use(corsMiddleware);
 
 // API Authentication middleware
 function authenticateApi(req, res, next) {
@@ -94,7 +142,13 @@ app.get('/health', (req, res) => {
 app.get('/api/session/:userId/status', (req, res) => {
   const { userId } = req.params;
   const status = getSessionStatus(userId);
-  res.json(status);
+  // Expose both camelCase (legacy) and snake_case (frontend contract) keys.
+  res.json({
+    ...status,
+    phone_number: status.phoneNumber,
+    connected_at: status.connectedAt,
+    created_at: status.createdAt,
+  });
 });
 
 /**
@@ -178,11 +232,127 @@ app.get('/api/sessions', (req, res) => {
 });
 
 // ============== WebSocket Server ==============
+//
+// Two WS routes are exposed:
+//   /ws                             — legacy control channel (JSON `auth` handshake,
+//                                     used by scripts and tests)
+//   /api/session/:userId/qr         — per-user QR channel consumed by the frontend.
+//                                     The path itself identifies the user, and the
+//                                     `X-API-Secret` header (or ?apiSecret= query
+//                                     param) is verified before the socket is upgraded.
+//                                     It auto-starts a session and streams QR /
+//                                     status frames.
 
 const server = createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
 
-wss.on('connection', (ws, req) => {
+const legacyWss = new WebSocketServer({ noServer: true });
+const qrWss = new WebSocketServer({ noServer: true });
+
+const QR_ROUTE_REGEX = /^\/api\/session\/([^/]+)\/qr\/?$/;
+
+server.on('upgrade', (req, socket, head) => {
+  let url;
+  try {
+    url = new URL(req.url, 'http://localhost');
+  } catch {
+    socket.destroy();
+    return;
+  }
+
+  if (url.pathname === '/ws') {
+    legacyWss.handleUpgrade(req, socket, head, (ws) => {
+      legacyWss.emit('connection', ws, req);
+    });
+    return;
+  }
+
+  const match = QR_ROUTE_REGEX.exec(url.pathname);
+  if (match) {
+    const userId = decodeURIComponent(match[1]);
+    const providedSecret = req.headers['x-api-secret'] || url.searchParams.get('apiSecret');
+    const requireAuth = process.env.NODE_ENV === 'production' || !!config.apiSecret;
+    if (requireAuth && providedSecret !== config.apiSecret) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    qrWss.handleUpgrade(req, socket, head, (ws) => {
+      qrWss.emit('connection', ws, req, userId);
+    });
+    return;
+  }
+
+  socket.destroy();
+});
+
+qrWss.on('connection', async (ws, req, userId) => {
+  logger.info({ userId, ip: req.socket.remoteAddress }, 'QR WebSocket client connected');
+
+  registerWsClient(userId, ws);
+
+  // Always send the current session status so the frontend has something to render.
+  const status = getSessionStatus(userId);
+  try {
+    ws.send(JSON.stringify({ type: 'session_status', ...status }));
+  } catch {}
+
+  // If the session is already waiting for a QR scan and a QR was already
+  // emitted (e.g. the session was started out-of-band by the backend or via
+  // HTTP POST /start before any WS client connected), resend the cached QR
+  // immediately. Without this the client would spin on "waiting for QR"
+  // because Baileys only emits each QR once on `connection.update`.
+  if (status && status.status === 'qr_pending' && status.qr) {
+    try {
+      ws.send(JSON.stringify({
+        type: 'qr',
+        qr: status.qr,
+        status: 'qr_pending',
+        message: 'Scan QR code with WhatsApp',
+      }));
+    } catch {}
+  }
+
+  // Auto-start a session if one isn't already active. For connected sessions
+  // the client will just see a `connected` status and no QR.
+  if (!status || status.status === 'not_found' || status.status === 'disconnected') {
+    try {
+      const result = await createSession(userId);
+      ws.send(JSON.stringify({
+        type: 'session_starting',
+        success: result.success,
+        status: result.status,
+        error: result.error,
+      }));
+    } catch (err) {
+      logger.error({ userId, err: err.message }, 'Failed to auto-start session from QR WS');
+    }
+  }
+
+  ws.on('message', async (data) => {
+    let msg;
+    try {
+      msg = JSON.parse(data.toString());
+    } catch {
+      return;
+    }
+    if (msg?.type === 'ping') {
+      ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+    } else if (msg?.type === 'disconnect_session') {
+      await destroySession(userId);
+    }
+  });
+
+  ws.on('close', () => {
+    unregisterWsClient(userId);
+    logger.info({ userId }, 'QR WebSocket client disconnected');
+  });
+
+  ws.on('error', (error) => {
+    logger.error({ error: error.message, userId }, 'QR WebSocket error');
+  });
+});
+
+legacyWss.on('connection', (ws, req) => {
   let userId = null;
   
   logger.info({ ip: req.socket.remoteAddress }, 'WebSocket client connected');
@@ -285,10 +455,12 @@ wss.on('connection', (ws, req) => {
 async function shutdown(signal) {
   logger.info({ signal }, 'Shutdown signal received');
   
-  // Close WebSocket server
-  wss.clients.forEach((client) => {
-    client.close(1001, 'Server shutting down');
-  });
+  // Close WebSocket servers
+  for (const wss of [legacyWss, qrWss]) {
+    wss.clients.forEach((client) => {
+      client.close(1001, 'Server shutting down');
+    });
+  }
   
   // Save all sessions
   await gracefulShutdown();
@@ -330,10 +502,27 @@ async function start() {
   // Initialize Redis for rate limiting
   await initRedis();
   
-  // Start HTTP server
+  // Surface bind failures (EADDRINUSE, EACCES, …) loudly and exit. Without
+  // this, `server.listen` swallows the error and the process keeps running in
+  // the background doing session restoration while nothing is served on HTTP,
+  // which produces extremely confusing "CORS failed" reports from the browser
+  // (the fetch actually reaches a different bridge instance, or nothing at all).
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      logger.fatal(
+        { port: config.port },
+        `Port ${config.port} is already in use. Another bridge instance is likely running. Exiting.`
+      );
+    } else {
+      logger.fatal({ error: err.message, code: err.code }, 'HTTP server error');
+    }
+    process.exit(1);
+  });
+
   server.listen(config.port, () => {
     logger.info(`WhatsApp Bridge running on http://localhost:${config.port}`);
-    logger.info(`WebSocket available at ws://localhost:${config.port}/ws`);
+    logger.info(`Legacy WebSocket at ws://localhost:${config.port}/ws`);
+    logger.info(`QR WebSocket at ws://localhost:${config.port}/api/session/:userId/qr`);
     logger.info(`Backend URL: ${config.backendUrl}`);
   });
   

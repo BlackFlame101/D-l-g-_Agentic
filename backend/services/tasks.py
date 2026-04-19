@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict
+import re
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List
 
 from celery_app import celery_app
 from core.config import settings
@@ -299,3 +300,199 @@ def _mark_kb_failed(kb_id: str, message: str) -> None:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+# ---------------------------------------------------------------------------
+# Subscription lifecycle (daily Celery beat jobs)
+# ---------------------------------------------------------------------------
+
+
+EXPIRY_WARNING_TEMPLATES: Dict[str, str] = {
+    "fr": (
+        "Bonjour {name}, votre abonnement Delege expire dans {days} jour(s) "
+        "({date}). Pensez à le renouveler pour que votre agent IA continue "
+        "à répondre à vos clients sans interruption."
+    ),
+    "ar": (
+        "مرحبا {name}، سينتهي اشتراكك في Delege خلال {days} يوم/أيام ({date}). "
+        "يرجى تجديده لكي يواصل الوكيل الذكي الرد على عملائك دون انقطاع."
+    ),
+    "en": (
+        "Hi {name}, your Delege subscription expires in {days} day(s) "
+        "({date}). Renew now so your AI agent keeps responding to your "
+        "customers without interruption."
+    ),
+}
+
+
+def _phone_to_jid(phone: str) -> str:
+    """Normalize a phone number into a Baileys-compatible WhatsApp JID."""
+    digits = re.sub(r"\D", "", phone or "")
+    if not digits:
+        raise ValueError("Empty phone number")
+    return f"{digits}@s.whatsapp.net"
+
+
+@celery_app.task(name="services.tasks.check_subscription_expiry")
+def check_subscription_expiry() -> Dict[str, Any]:
+    """Mark active subscriptions whose ``expires_at`` has passed as ``expired``.
+
+    Also pauses any agents owned by those users so the worker stops replying
+    on their behalf. Designed to run daily via Celery beat.
+    """
+    admin = get_admin_client()
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+
+    resp = (
+        admin.table("subscriptions")
+        .select("id,user_id,expires_at")
+        .eq("status", "active")
+        .is_("deleted_at", "null")
+        .lt("expires_at", now_iso)
+        .execute()
+    )
+    rows = resp.data or []
+    if not rows:
+        logger.info("No subscriptions to expire")
+        return {"expired": 0}
+
+    sub_ids = [r["id"] for r in rows]
+    user_ids: List[str] = list({str(r["user_id"]) for r in rows if r.get("user_id")})
+
+    admin.table("subscriptions").update(
+        {"status": "expired", "updated_at": now_iso}
+    ).in_("id", sub_ids).execute()
+
+    if user_ids:
+        try:
+            admin.table("agents").update(
+                {"is_active": False, "updated_at": now_iso}
+            ).in_("user_id", user_ids).is_("deleted_at", "null").execute()
+        except Exception as exc:  # pragma: no cover - non-fatal
+            logger.warning("Could not deactivate agents", extra={"error": str(exc)})
+
+    logger.info(
+        "Subscriptions expired",
+        extra={"count": len(rows), "users": len(user_ids)},
+    )
+    return {"expired": len(rows), "users": len(user_ids)}
+
+
+@celery_app.task(name="services.tasks.send_expiry_warnings")
+def send_expiry_warnings(days_before: int = 3) -> Dict[str, Any]:
+    """Find active subscriptions expiring in ~``days_before`` days and notify.
+
+    A 24h window is used so the job is forgiving of beat clock drift.
+    """
+    admin = get_admin_client()
+    now = datetime.now(timezone.utc)
+    target_start = now + timedelta(days=days_before)
+    target_end = target_start + timedelta(hours=24)
+
+    resp = (
+        admin.table("subscriptions")
+        .select("id,user_id,expires_at")
+        .eq("status", "active")
+        .is_("deleted_at", "null")
+        .gte("expires_at", target_start.isoformat())
+        .lt("expires_at", target_end.isoformat())
+        .execute()
+    )
+    rows = resp.data or []
+    queued = 0
+    for row in rows:
+        user_id = row.get("user_id")
+        if not user_id:
+            continue
+        notify_user_expiry.delay(str(user_id), days_before)
+        queued += 1
+
+    logger.info("Queued expiry warnings", extra={"count": queued})
+    return {"queued": queued}
+
+
+@celery_app.task(
+    bind=True,
+    max_retries=2,
+    name="services.tasks.notify_user_expiry",
+)
+def notify_user_expiry(self, user_id: str, days_left: int) -> Dict[str, Any]:
+    """Send a localized "your sub expires soon" message to ``user_id``."""
+    admin = get_admin_client()
+
+    profile_resp = (
+        admin.table("users")
+        .select("full_name,language_preference")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not profile_resp.data:
+        return {"status": "no_profile"}
+    profile = profile_resp.data[0]
+    lang = (profile.get("language_preference") or "fr").lower()
+    template = EXPIRY_WARNING_TEMPLATES.get(lang, EXPIRY_WARNING_TEMPLATES["fr"])
+    name = profile.get("full_name") or ""
+
+    sub_resp = (
+        admin.table("subscriptions")
+        .select("expires_at")
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .is_("deleted_at", "null")
+        .order("expires_at", desc=False)
+        .limit(1)
+        .execute()
+    )
+    expires_at = (sub_resp.data or [{}])[0].get("expires_at")
+    expires_str = "—"
+    if expires_at:
+        try:
+            dt = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+            expires_str = dt.date().isoformat()
+        except ValueError:
+            pass
+
+    session_resp = (
+        admin.table("whatsapp_sessions")
+        .select("phone_number,status")
+        .eq("user_id", user_id)
+        .is_("deleted_at", "null")
+        .order("updated_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    session = (session_resp.data or [{}])[0]
+    phone = session.get("phone_number")
+    if not phone or session.get("status") != "connected":
+        logger.info(
+            "Skipping expiry notice; no connected session",
+            extra={"user_id": user_id, "status": session.get("status")},
+        )
+        return {"status": "skipped_no_session"}
+
+    try:
+        jid = _phone_to_jid(phone)
+    except ValueError:
+        return {"status": "invalid_phone"}
+
+    message = template.format(
+        name=name.strip() or "",
+        days=days_left,
+        date=expires_str,
+    )
+
+    try:
+        send_whatsapp_reply(user_id, jid, message)
+    except BridgeError as exc:
+        logger.warning(
+            "Could not deliver expiry notice",
+            extra={"user_id": user_id, "error": str(exc)},
+        )
+        try:
+            raise self.retry(exc=exc, countdown=60 * 30)
+        except self.MaxRetriesExceededError:
+            return {"status": "bridge_failed", "error": str(exc)}
+
+    return {"status": "sent"}

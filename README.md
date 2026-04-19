@@ -89,14 +89,24 @@ cd backend
 # Activate venv first
 celery -A celery_app worker --loglevel=info
 
-# Terminal 4: Frontend
+# Terminal 4: Celery Beat (Phase 6 — daily subscription expiry / warning jobs)
+cd backend
+# Activate venv first
+celery -A celery_app beat --loglevel=info
+
+# Terminal 5: Frontend
 cd frontend
 npm run dev
 
-# Terminal 5: WhatsApp Bridge
+# Terminal 6: WhatsApp Bridge
 cd whatsapp-bridge
 npm run dev
 ```
+
+> The Celery beat process is what fires the daily `check_subscription_expiry`
+> and `send_expiry_warnings` tasks. Without it, expired subscriptions never
+> flip state and renewal warnings never get sent. You can also run the beat
+> via Docker Compose with `docker-compose --profile beat up celery-beat`.
 
 ### 5. Access the App
 
@@ -119,6 +129,24 @@ npm run dev:bridge     # Start WhatsApp bridge dev server
 npm run dev:backend    # Start FastAPI dev server
 npm run dev:celery     # Start Celery worker
 ```
+
+### Celery Beat (Phase 6)
+
+Run the periodic scheduler in its own process — it dispatches daily
+`check_subscription_expiry` (marks expired subs, pauses agents) and
+`send_expiry_warnings` (queues WhatsApp notices 3 days before expiry).
+
+```bash
+# Native (recommended for development):
+cd backend
+celery -A celery_app beat --loglevel=info
+
+# Docker Compose (opt-in profile):
+docker-compose --profile beat up celery-beat
+```
+
+In production deploy this as its own Railway service with the same env
+vars as the backend / worker, and run a single replica.
 
 ## Supabase Project
 

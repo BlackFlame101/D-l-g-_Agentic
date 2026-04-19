@@ -42,28 +42,10 @@
     "subtitle": "Choisissez le plan adapté à la taille de votre entreprise.",
     "popular": "POPULAIRE",
     "perMonth": "MAD/mois",
-    "starterName": "Starter",
-    "starterDesc": "Pour les petites entreprises",
-    "starterPrice": "299",
-    "starterFeature1": "Jusqu'à 500 conversations / mois",
-    "starterFeature2": "Support Darija & Français",
-    "starterFeature3": "1 Agent IA WhatsApp",
-    "starterCta": "Choisir Starter",
-    "proName": "Pro",
-    "proDesc": "La meilleure valeur pour votre argent",
-    "proPrice": "599",
-    "proFeature1": "Conversations illimitées",
-    "proFeature2": "Intégration CRM Basique",
-    "proFeature3": "Dashboard Analytics Avancé",
-    "proFeature4": "Support Prioritaire 24/7",
-    "proCta": "Choisir Pro",
-    "businessName": "Business",
-    "businessDesc": "Pour les grandes entreprises",
-    "businessPrice": "999",
-    "businessFeature1": "Multi-numéros WhatsApp",
-    "businessFeature2": "API & Webhooks Personnalisés",
-    "businessFeature3": "Account Manager Dédié",
-    "businessCta": "Choisir Business"
+    "messageSuffix": "messages/mois",
+    "ctaContact": "Contactez-nous sur WhatsApp",
+    "noPlans": "Aucun plan disponible pour le moment.",
+    "contactMessage": "Bonjour, je souhaite souscrire au plan {plan} de Déléguè."
   },
   "FAQ": {
     "title": "Questions Fréquentes",
@@ -281,7 +263,12 @@
       "transferTo": "Transférer à",
       "afterPayment": "Après le paiement",
       "afterPaymentDesc": "Envoyez votre reçu de paiement via WhatsApp et nous activerons votre abonnement en quelques heures.",
-      "copied": "Copié dans le presse-papiers !"
+      "copied": "Copié dans le presse-papiers !",
+      "expiringSoonTitle": "Votre abonnement expire dans {days} jour(s)",
+      "expiringSoonDesc": "Renouvelez maintenant pour éviter toute interruption du service.",
+      "renewNow": "Renouveler",
+      "whatsappRenewMessage": "Bonjour, je souhaite renouveler mon abonnement {plan} sur Déléguè.",
+      "whatsappContactMessage": "Bonjour, je souhaite souscrire à un abonnement sur Déléguè."
     },
     "settings": {
       "title": "Paramètres",
@@ -319,6 +306,105 @@
       "saveProfile": "Échec de la mise à jour du profil.",
       "changePassword": "Échec du changement de mot de passe.",
       "deleteAccount": "Échec de la suppression du compte."
+    }
+  },
+  "Admin": {
+    "title": "Administration",
+    "backToApp": "Retour à l'application",
+    "nav": {
+      "overview": "Vue d'ensemble",
+      "users": "Utilisateurs",
+      "subscriptions": "Abonnements"
+    },
+    "home": {
+      "title": "Tableau d'administration",
+      "subtitle": "Suivez vos clients, abonnements et utilisation.",
+      "manageUsers": "Gérer les utilisateurs"
+    },
+    "stats": {
+      "totalUsers": "Utilisateurs totaux",
+      "activeSubs": "Abonnements actifs",
+      "pendingSubs": "En attente",
+      "pendingHint": "Inscrits sans plan actif",
+      "expiringSoon": "Expirent bientôt",
+      "expiringHint": "Dans les 7 prochains jours",
+      "messages30d": "Messages (30j)",
+      "mrr": "MRR estimé",
+      "mrrHint": "Total des plans actifs"
+    },
+    "status": {
+      "none": "Aucun",
+      "pending": "En attente",
+      "active": "Actif",
+      "expired": "Expiré",
+      "cancelled": "Annulé"
+    },
+    "users": {
+      "title": "Utilisateurs",
+      "subtitle": "Tous les utilisateurs inscrits sur Déléguè.",
+      "searchPlaceholder": "Rechercher par nom, entreprise ou téléphone...",
+      "filterAll": "Tous les statuts",
+      "filterNone": "Sans abonnement",
+      "empty": "Aucun utilisateur trouvé.",
+      "messages30d": "{count, plural, =0 {0 message} one {# message} other {# messages}} (30j)",
+      "showing": "Affichage {from}-{to}",
+      "prev": "Précédent",
+      "next": "Suivant"
+    },
+    "user": {
+      "backToUsers": "Retour aux utilisateurs",
+      "activatePlan": "Activer un plan",
+      "profile": "Profil",
+      "phone": "Téléphone",
+      "language": "Langue",
+      "signedUp": "Inscrit le",
+      "lastSignIn": "Dernière connexion",
+      "usage30d": "Utilisation (30 derniers jours)",
+      "messages": "messages",
+      "noUsage": "Aucune utilisation enregistrée.",
+      "subscriptionsTitle": "Historique des abonnements",
+      "noSubscriptions": "Aucun abonnement.",
+      "msgLimit": "messages/mois",
+      "used": "utilisés",
+      "created": "Créé",
+      "expires": "expire",
+      "payRef": "Réf. paiement",
+      "cancel": "Annuler",
+      "confirmCancel": "Annuler cet abonnement ?",
+      "cancelled": "Abonnement annulé.",
+      "activated": "Abonnement activé !"
+    },
+    "subscriptions": {
+      "title": "Abonnements actifs",
+      "subtitle": "Liste des utilisateurs avec un abonnement actif.",
+      "empty": "Aucun abonnement actif pour le moment.",
+      "expires": "expire le"
+    },
+    "activate": {
+      "title": "Activer un abonnement",
+      "description": "Activer un nouveau plan pour {name}. Cela annulera tout abonnement existant.",
+      "plan": "Plan",
+      "noPlans": "Aucun plan disponible.",
+      "method": "Méthode de paiement",
+      "bankTransfer": "Virement bancaire",
+      "cashplus": "CashPlus",
+      "cash": "Espèces",
+      "reference": "Référence de paiement",
+      "referencePlaceholder": "ex. TX-12345",
+      "optional": "optionnel",
+      "expiresAt": "Date d'expiration",
+      "submit": "Activer",
+      "submitting": "Activation...",
+      "cancel": "Annuler"
+    },
+    "errors": {
+      "loadStats": "Échec du chargement des statistiques.",
+      "loadUsers": "Échec du chargement des utilisateurs.",
+      "loadUser": "Échec du chargement de l'utilisateur.",
+      "userNotFound": "Utilisateur introuvable.",
+      "loadPlans": "Échec du chargement des plans.",
+      "activateSubscription": "Échec de l'activation.",
+      "cancelSubscription": "Échec de l'annulation."
     }
   },
   "Privacy": {

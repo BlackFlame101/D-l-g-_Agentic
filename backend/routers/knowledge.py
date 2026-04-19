@@ -93,7 +93,7 @@ async def create_knowledge_entry(
         "file_url": payload.storage_path,
         "file_type": file_type,
         "file_size_bytes": payload.file_size_bytes,
-        "status": "queued",
+        "status": "pending",
         "chunk_count": 0,
     }
     resp = admin.table("knowledge_bases").insert(row).execute()
@@ -146,5 +146,5 @@ async def delete_knowledge_entry(
 
     admin.table("knowledge_chunks").delete().eq("knowledge_base_id", str(kb_id)).execute()
     admin.table("knowledge_bases").update(
-        {"deleted_at": _now_iso(), "status": "deleted", "chunk_count": 0}
+        {"deleted_at": _now_iso(), "chunk_count": 0}
     ).eq("id", str(kb_id)).execute()

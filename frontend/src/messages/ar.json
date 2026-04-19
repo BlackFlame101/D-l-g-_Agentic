@@ -42,28 +42,10 @@
     "subtitle": "اختر الخطة المناسبة لحجم شركتك.",
     "popular": "الأكثر شعبية",
     "perMonth": "درهم/شهر",
-    "starterName": "Starter",
-    "starterDesc": "للشركات الصغيرة",
-    "starterPrice": "299",
-    "starterFeature1": "حتى 500 محادثة/شهر",
-    "starterFeature2": "دعم الدارجة والفرنسية",
-    "starterFeature3": "وكيل ذكاء اصطناعي واحد",
-    "starterCta": "اختر Starter",
-    "proName": "Pro",
-    "proDesc": "أفضل قيمة مقابل المال",
-    "proPrice": "599",
-    "proFeature1": "محادثات غير محدودة",
-    "proFeature2": "تكامل CRM أساسي",
-    "proFeature3": "لوحة تحليلات متقدمة",
-    "proFeature4": "دعم أولوية 24/7",
-    "proCta": "اختر Pro",
-    "businessName": "Business",
-    "businessDesc": "للشركات الكبيرة",
-    "businessPrice": "999",
-    "businessFeature1": "أرقام واتساب متعددة",
-    "businessFeature2": "API وWebhooks مخصصة",
-    "businessFeature3": "مدير حساب مخصص",
-    "businessCta": "اختر Business"
+    "messageSuffix": "رسالة/شهر",
+    "ctaContact": "تواصل معنا عبر واتساب",
+    "noPlans": "لا توجد خطط متاحة حالياً.",
+    "contactMessage": "مرحبا، أرغب في الاشتراك في خطة {plan} على Déléguè."
   },
   "FAQ": {
     "title": "الأسئلة الشائعة",
@@ -281,7 +263,12 @@
       "transferTo": "تحويل إلى",
       "afterPayment": "بعد الدفع",
       "afterPaymentDesc": "أرسل إيصال الدفع عبر واتساب وسنفعّل اشتراكك خلال ساعات.",
-      "copied": "تم النسخ!"
+      "copied": "تم النسخ!",
+      "expiringSoonTitle": "ينتهي اشتراكك خلال {days} يوم/أيام",
+      "expiringSoonDesc": "جدّد الآن لتفادي أي انقطاع للخدمة.",
+      "renewNow": "تجديد",
+      "whatsappRenewMessage": "مرحبا، أود تجديد اشتراكي في خطة {plan} على Déléguè.",
+      "whatsappContactMessage": "مرحبا، أود الاشتراك في Déléguè."
     },
     "settings": {
       "title": "الإعدادات",
@@ -319,6 +306,105 @@
       "saveProfile": "فشل تحديث الملف الشخصي.",
       "changePassword": "فشل تغيير كلمة المرور.",
       "deleteAccount": "فشل حذف الحساب."
+    }
+  },
+  "Admin": {
+    "title": "الإدارة",
+    "backToApp": "العودة إلى التطبيق",
+    "nav": {
+      "overview": "نظرة عامة",
+      "users": "المستخدمون",
+      "subscriptions": "الاشتراكات"
+    },
+    "home": {
+      "title": "لوحة الإدارة",
+      "subtitle": "تابع العملاء والاشتراكات والاستخدام.",
+      "manageUsers": "إدارة المستخدمين"
+    },
+    "stats": {
+      "totalUsers": "إجمالي المستخدمين",
+      "activeSubs": "اشتراكات نشطة",
+      "pendingSubs": "قيد الانتظار",
+      "pendingHint": "مسجلون بدون خطة نشطة",
+      "expiringSoon": "تنتهي قريباً",
+      "expiringHint": "خلال الأيام السبعة القادمة",
+      "messages30d": "الرسائل (30 يوم)",
+      "mrr": "الإيراد الشهري المقدر",
+      "mrrHint": "مجموع الخطط النشطة"
+    },
+    "status": {
+      "none": "لا يوجد",
+      "pending": "قيد الانتظار",
+      "active": "نشط",
+      "expired": "منتهي",
+      "cancelled": "ملغى"
+    },
+    "users": {
+      "title": "المستخدمون",
+      "subtitle": "جميع المستخدمين المسجلين في Déléguè.",
+      "searchPlaceholder": "ابحث بالاسم أو الشركة أو الهاتف...",
+      "filterAll": "كل الحالات",
+      "filterNone": "بدون اشتراك",
+      "empty": "لم يتم العثور على مستخدمين.",
+      "messages30d": "{count, plural, =0 {0 رسالة} one {# رسالة} other {# رسالة}} (30 يوم)",
+      "showing": "عرض {from}-{to}",
+      "prev": "السابق",
+      "next": "التالي"
+    },
+    "user": {
+      "backToUsers": "العودة إلى المستخدمين",
+      "activatePlan": "تفعيل خطة",
+      "profile": "الملف الشخصي",
+      "phone": "الهاتف",
+      "language": "اللغة",
+      "signedUp": "تاريخ التسجيل",
+      "lastSignIn": "آخر تسجيل دخول",
+      "usage30d": "الاستخدام (آخر 30 يوماً)",
+      "messages": "رسائل",
+      "noUsage": "لا يوجد استخدام مسجل.",
+      "subscriptionsTitle": "سجل الاشتراكات",
+      "noSubscriptions": "لا توجد اشتراكات.",
+      "msgLimit": "رسالة/شهر",
+      "used": "مستخدم",
+      "created": "أنشئ في",
+      "expires": "ينتهي",
+      "payRef": "مرجع الدفع",
+      "cancel": "إلغاء",
+      "confirmCancel": "إلغاء هذا الاشتراك؟",
+      "cancelled": "تم إلغاء الاشتراك.",
+      "activated": "تم تفعيل الاشتراك!"
+    },
+    "subscriptions": {
+      "title": "الاشتراكات النشطة",
+      "subtitle": "المستخدمون الذين لديهم اشتراك نشط.",
+      "empty": "لا توجد اشتراكات نشطة بعد.",
+      "expires": "ينتهي في"
+    },
+    "activate": {
+      "title": "تفعيل اشتراك",
+      "description": "تفعيل خطة جديدة لـ {name}. سيتم إلغاء أي اشتراك قائم.",
+      "plan": "الخطة",
+      "noPlans": "لا توجد خطط متاحة.",
+      "method": "طريقة الدفع",
+      "bankTransfer": "تحويل بنكي",
+      "cashplus": "CashPlus",
+      "cash": "نقداً",
+      "reference": "مرجع الدفع",
+      "referencePlaceholder": "مثلاً TX-12345",
+      "optional": "اختياري",
+      "expiresAt": "تاريخ الانتهاء",
+      "submit": "تفعيل",
+      "submitting": "جاري التفعيل...",
+      "cancel": "إلغاء"
+    },
+    "errors": {
+      "loadStats": "فشل تحميل الإحصائيات.",
+      "loadUsers": "فشل تحميل المستخدمين.",
+      "loadUser": "فشل تحميل المستخدم.",
+      "userNotFound": "المستخدم غير موجود.",
+      "loadPlans": "فشل تحميل الخطط.",
+      "activateSubscription": "فشل تفعيل الاشتراك.",
+      "cancelSubscription": "فشل إلغاء الاشتراك."
     }
   },
   "Privacy": {

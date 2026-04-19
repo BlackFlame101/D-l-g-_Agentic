@@ -16,7 +16,8 @@ redis>=5.2.0
 supabase>=2.9.0,<2.10.0
 
 # LLM (unified SDK, required by Agno's Gemini integration as well)
-google-genai>=1.0.0
+# Agno 2.x imports types (e.g. FileSearch) that only exist in google-genai >= 1.20
+google-genai>=1.20.0
 
 # Document Processing (for knowledge base)
 pypdf>=5.0.0
@@ -30,8 +31,16 @@ tiktoken>=0.8.0
 python-dotenv>=1.0.1
 
 # HTTP Client
-httpx>=0.27.0,<0.28.0
+# Note: google-genai >= 1.20 requires httpx >= 0.28, so we lift the old <0.28 cap.
+httpx>=0.28.0,<0.29.0
 
 # Utilities
 pydantic>=2.10.0
 pydantic-settings>=2.6.0
+
+# -------- test (install with `pip install -r requirements.txt`) --------
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+pytest-timeout>=2.3.0
+respx>=0.22.0
+websockets>=13.0

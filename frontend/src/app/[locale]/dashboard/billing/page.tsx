@@ -13,13 +13,22 @@ import {
   CreditCard,
   Calendar,
   MessageSquare,
-  ExternalLink,
   Building2,
   Phone,
   Copy,
   CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
+
+const RIB =
+  process.env.NEXT_PUBLIC_PAYMENT_RIB || "XXX XXXX XXXX XXXX XXXX XX";
+const CASHPLUS_PHONE =
+  process.env.NEXT_PUBLIC_PAYMENT_CASHPLUS || "+212 6XX XXX XXX";
+const BENEFICIARY =
+  process.env.NEXT_PUBLIC_PAYMENT_BENEFICIARY || "Déléguè SARL";
+const SALES_WHATSAPP =
+  (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "").replace(/\D/g, "");
 
 interface Subscription {
   id: string;
@@ -93,6 +102,27 @@ export default function BillingPage() {
       )
     : 0;
 
+  const daysUntilExpiry = subscription?.expires_at
+    ? Math.ceil(
+        (new Date(subscription.expires_at).getTime() - Date.now()) /
+          (1000 * 60 * 60 * 24)
+      )
+    : null;
+  const expiringSoon =
+    subscription?.status === "active" &&
+    daysUntilExpiry !== null &&
+    daysUntilExpiry >= 0 &&
+    daysUntilExpiry <= 3;
+
+  const contactMessage = encodeURIComponent(
+    plan
+      ? t("billing.whatsappRenewMessage", { plan: plan.name })
+      : t("billing.whatsappContactMessage")
+  );
+  const whatsappHref = SALES_WHATSAPP
+    ? `https://wa.me/${SALES_WHATSAPP}?text=${contactMessage}`
+    : "#";
+
   if (loading) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
@@ -118,6 +148,31 @@ export default function BillingPage() {
           {t("billing.description")}
         </p>
       </div>
+
+      {expiringSoon && (
+        <div className="flex items-start gap-3 rounded-lg border border-chart-4/40 bg-chart-4/10 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-chart-4" />
+          <div className="flex-1 text-sm">
+            <p className="font-medium text-foreground">
+              {t("billing.expiringSoonTitle", { days: daysUntilExpiry! })}
+            </p>
+            <p className="text-muted-foreground">
+              {t("billing.expiringSoonDesc")}
+            </p>
+          </div>
+          {SALES_WHATSAPP && (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 items-center justify-center gap-1 rounded-lg bg-chart-4 px-3 text-xs font-semibold text-white hover:bg-chart-4/90"
+            >
+              <Phone className="h-3.5 w-3.5" />
+              {t("billing.renewNow")}
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Current plan */}
       <Card>
@@ -166,10 +221,22 @@ export default function BillingPage() {
               <p className="text-sm text-muted-foreground">
                 {t("billing.noPlan")}
               </p>
-              <Button className="mt-3 gap-2">
-                <Phone className="h-4 w-4" />
-                {t("billing.contactWhatsApp")}
-              </Button>
+              {SALES_WHATSAPP ? (
+                <a
+                  href={whatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                >
+                  <Phone className="h-4 w-4" />
+                  {t("billing.contactWhatsApp")}
+                </a>
+              ) : (
+                <Button className="mt-3 gap-2" disabled>
+                  <Phone className="h-4 w-4" />
+                  {t("billing.contactWhatsApp")}
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
@@ -216,10 +283,10 @@ export default function BillingPage() {
               icon={<Building2 className="h-5 w-5" />}
               title={t("billing.bankTransfer")}
               details={[
-                { label: "RIB", value: "XXX XXXX XXXX XXXX XXXX XX" },
+                { label: "RIB", value: RIB },
                 {
                   label: t("billing.beneficiary"),
-                  value: "Déléguè SARL",
+                  value: BENEFICIARY,
                 },
               ]}
               copied={copied}
@@ -231,13 +298,25 @@ export default function BillingPage() {
               details={[
                 {
                   label: t("billing.transferTo"),
-                  value: "+212 6XX XXX XXX",
+                  value: CASHPLUS_PHONE,
                 },
               ]}
               copied={copied}
               onCopy={copyToClipboard}
             />
           </div>
+
+          {SALES_WHATSAPP && (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-accent"
+            >
+              <Phone className="h-4 w-4" />
+              {t("billing.contactWhatsApp")}
+            </a>
+          )}
 
           <div className="rounded-lg bg-primary/10 p-4 text-sm text-foreground">
             <p className="font-medium">{t("billing.afterPayment")}</p>

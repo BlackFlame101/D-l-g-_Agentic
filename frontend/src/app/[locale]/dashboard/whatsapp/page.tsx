@@ -42,22 +42,35 @@ export default function WhatsAppPage() {
 
   useEffect(() => {
     if (!user) return;
-    checkStatus();
+    (async () => {
+      const initial = await checkStatus();
+      // Auto-open the QR WebSocket whenever the bridge isn't already connected.
+      // Without this, a session that's in `qr_pending` from a previous visit or
+      // a backend-initiated start leaves the UI spinning on "waiting for QR"
+      // until the user manually clicks "Scan QR".
+      if (initial !== "connected") {
+        connectQr();
+      }
+    })();
     return () => {
       wsRef.current?.close();
       if (pollRef.current) clearInterval(pollRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  async function checkStatus() {
-    if (!user) return;
+  async function checkStatus(): Promise<ConnectionStatus> {
+    if (!user) return "disconnected";
     setLoading(true);
     try {
       const data = await getWhatsAppStatus(user.id);
-      setStatus(data.status as ConnectionStatus);
+      const s = data.status as ConnectionStatus;
+      setStatus(s);
       if (data.phone_number) setPhoneNumber(data.phone_number);
+      return s;
     } catch {
       setStatus("disconnected");
+      return "disconnected";
     } finally {
       setLoading(false);
     }

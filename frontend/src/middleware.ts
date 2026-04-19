@@ -38,9 +38,10 @@ export async function middleware(request: NextRequest) {
   const locale = localeMatch ? localeMatch[1] : "fr";
 
   const isDashboardRoute = pathname.includes("/dashboard");
+  const isAdminRoute = pathname.includes("/admin");
   const isAuthRoute = pathname.includes("/auth/");
 
-  if (!user && isDashboardRoute) {
+  if (!user && (isDashboardRoute || isAdminRoute)) {
     const url = request.nextUrl.clone();
     url.pathname = `/${locale}/auth/login`;
     return NextResponse.redirect(url);
@@ -50,6 +51,20 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = `/${locale}/dashboard`;
     return NextResponse.redirect(url);
+  }
+
+  if (user && isAdminRoute) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("is_admin")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!profile?.is_admin) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/${locale}/dashboard`;
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

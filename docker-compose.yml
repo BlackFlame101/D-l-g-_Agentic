@@ -24,6 +24,30 @@ services:
       timeout: 5s
       retries: 5
 
+  # Celery Beat scheduler — runs Phase 6 daily expiry jobs.
+  # Opt in with: docker-compose --profile beat up
+  # On Railway/Vercel this becomes its own deployment running:
+  #   celery -A celery_app beat --loglevel=info
+  celery-beat:
+    image: python:3.11-slim
+    container_name: delege-celery-beat
+    profiles: ["beat"]
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "pip install --quiet -r requirements.txt &&
+             celery -A celery_app beat --loglevel=info"
+
 volumes:
   redis_data:
     driver: local

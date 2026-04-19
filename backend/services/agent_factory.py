@@ -9,6 +9,7 @@ in Supabase and replayed here; we do not rely on Agno's session storage.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -128,6 +129,35 @@ def _build_input_messages(
     return messages
 
 
+def _test_llm_mode() -> str:
+    """Read the TEST_LLM_MODE knob at call time so tests can flip it."""
+    return (os.environ.get("TEST_LLM_MODE") or settings.test_llm_mode or "").strip().lower()
+
+
+def _stub_reply(user_message: str, fallback: str, mode: str) -> AgentReply:
+    """Deterministic reply used by the test harness. Never called in prod."""
+    if mode == "stub_error":
+        raise RuntimeError("TEST_LLM_MODE=stub_error: forced agent failure")
+    if mode == "stub_fallback":
+        return AgentReply(
+            content=fallback,
+            tokens_used=approximate_token_count(fallback),
+            input_tokens=0,
+            output_tokens=0,
+            used_fallback=True,
+        )
+    # Default stub: echo a short deterministic reply
+    snippet = (user_message or "").strip().replace("\n", " ")[:40]
+    content = f"[stub] {snippet}"
+    return AgentReply(
+        content=content,
+        tokens_used=1,
+        input_tokens=approximate_token_count(user_message),
+        output_tokens=approximate_token_count(content),
+        used_fallback=False,
+    )
+
+
 def generate_reply(
     agent_row: dict,
     user_message: str,
@@ -146,6 +176,20 @@ def generate_reply(
         or agent_row.get("fallback_message")
         or "Sorry, I'm having trouble answering right now. I'll get back to you shortly."
     )
+
+    mode = _test_llm_mode()
+    if mode:
+        try:
+            return _stub_reply(user_message, fallback, mode)
+        except Exception as exc:
+            logger.warning("Stub LLM raised, using fallback", extra={"error": str(exc)})
+            return AgentReply(
+                content=fallback,
+                tokens_used=approximate_token_count(fallback),
+                input_tokens=0,
+                output_tokens=0,
+                used_fallback=True,
+            )
 
     try:
         agent = _build_agent(system_prompt)

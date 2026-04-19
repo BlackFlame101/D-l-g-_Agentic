@@ -14,6 +14,27 @@ export const config = {
   
   // API Authentication (shared secret with backend)
   apiSecret: process.env.API_SECRET || 'dev-secret-change-in-production',
+
+  // CORS: list of allowed browser origins. "*" allows any. Accepts either:
+  //   - comma-separated string:  http://localhost:3000,http://a.b
+  //   - pydantic-style JSON list: ["http://localhost:3000","http://a.b"]
+  // The frontend calls this bridge directly from the browser (not proxied
+  // through FastAPI), so we need an explicit allow-list. We tolerate the
+  // JSON-array form because developers commonly share a single CORS_ORIGINS
+  // value between the Python backend (pydantic) and this Node bridge.
+  corsOrigins: (() => {
+    const raw = (process.env.CORS_ORIGINS || '').trim();
+    if (!raw) return ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    if (raw.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map(String).map(s => s.trim()).filter(Boolean);
+      } catch {
+        // fall through to comma-split
+      }
+    }
+    return raw.split(',').map(s => s.trim()).filter(Boolean);
+  })(),
   
   // Supabase
   supabaseUrl: process.env.SUPABASE_URL,

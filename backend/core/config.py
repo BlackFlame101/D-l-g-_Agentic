@@ -38,7 +38,11 @@ class Settings(BaseSettings):
     # Google Gemini
     google_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
-    gemini_embedding_model: str = "text-embedding-004"
+    # text-embedding-004 is no longer exposed through the v1beta `embedContent`
+    # endpoint on current API keys (returns 404 NOT_FOUND). Use the unified
+    # `gemini-embedding-001` model and explicitly request 768-dim output so it
+    # fits the `vector(768)` column in `knowledge_chunks`.
+    gemini_embedding_model: str = "gemini-embedding-001"
     gemini_embedding_dimensions: int = 768
 
     # WhatsApp Bridge
@@ -60,6 +64,11 @@ class Settings(BaseSettings):
 
     # Storage
     knowledge_bucket: str = "knowledge-files"
+
+    # Test harness knobs (never set in production). Read at call time so
+    # tests can flip them via environment variables per-test.
+    test_llm_mode: str = ""  # "", "stub", "stub_fallback", "stub_error"
+    test_embed_mode: str = ""  # "", "stub"
 
     @property
     def is_configured(self) -> bool:
