@@ -12,8 +12,10 @@ agno>=1.5.0
 celery>=5.4.0
 redis>=5.2.0
 
-# Database (pinned to avoid pyiceberg dependency)
-supabase>=2.9.0,<2.10.0
+# Database
+# 2.9.x pinned httpx<0.28 which conflicts with google-genai>=1.20. 2.15+ widened
+# the range to httpx<0.29 and no longer pulls pyiceberg transitively.
+supabase>=2.15.0,<3.0.0
 
 # LLM (unified SDK, required by Agno's Gemini integration as well)
 # Agno 2.x imports types (e.g. FileSearch) that only exist in google-genai >= 1.20
