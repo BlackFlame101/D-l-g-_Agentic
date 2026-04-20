@@ -120,7 +120,6 @@ export async function getAllActiveSessions() {
   const { data, error } = await db
     .from('whatsapp_sessions')
     .select('user_id, session_data, phone_number')
-    .eq('status', 'connected')
     .is('deleted_at', null)
     .not('session_data', 'is', null);
   

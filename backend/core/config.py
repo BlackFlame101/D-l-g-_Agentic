@@ -57,7 +57,7 @@ class Settings(BaseSettings):
 
     # RAG / conversation tuning
     rag_top_k: int = 5
-    rag_match_threshold: float = 0.65
+    rag_match_threshold: float = 0.30
     conversation_history_limit: int = 10
 
     # Document processing

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import List
 
@@ -76,6 +77,16 @@ def retrieve_context(
         for row in rows
     ]
 
+    # If vector search returns nothing (often due to language mismatch / typo),
+    # fall back to a lightweight lexical search so the assistant can still use KB.
+    if not chunks:
+        chunks = _lexical_fallback_context(agent_id=agent_id, query=query, k=k)
+        if chunks:
+            logger.info(
+                "RAG lexical fallback matched chunks",
+                extra={"agent_id": agent_id, "chunk_count": len(chunks)},
+            )
+
     logger.info(
         "RAG retrieved chunks",
         extra={
@@ -85,6 +96,88 @@ def retrieve_context(
         },
     )
     return chunks
+
+
+def _lexical_fallback_context(agent_id: str, query: str, k: int) -> List[RetrievedChunk]:
+    tokens = _query_tokens(query)
+    if not tokens:
+        return []
+
+    # Try the most meaningful tokens first.
+    top_tokens = tokens[:4]
+    admin = get_admin_client()
+
+    kb_resp = (
+        admin.table("knowledge_bases")
+        .select("id")
+        .eq("agent_id", agent_id)
+        .eq("status", "ready")
+        .is_("deleted_at", "null")
+        .limit(50)
+        .execute()
+    )
+    kb_rows = kb_resp.data or []
+    kb_ids = [str(row["id"]) for row in kb_rows if row.get("id")]
+    if not kb_ids:
+        return []
+
+    # Query with multiple token attempts and dedupe by chunk id.
+    dedup: dict[str, RetrievedChunk] = {}
+    for token in top_tokens:
+        resp = (
+            admin.table("knowledge_chunks")
+            .select("id,content,metadata,knowledge_base_id")
+            .in_("knowledge_base_id", kb_ids)
+            .ilike("content", f"%{token}%")
+            .limit(max(k * 2, 10))
+            .execute()
+        )
+        for row in (resp.data or []):
+            cid = str(row.get("id") or "")
+            if not cid or cid in dedup:
+                continue
+            dedup[cid] = RetrievedChunk(
+                id=cid,
+                content=row.get("content") or "",
+                # Synthetic similarity score for lexical fallback.
+                similarity=0.51,
+                metadata=row.get("metadata") or {},
+            )
+            if len(dedup) >= k:
+                return list(dedup.values())[:k]
+
+    return list(dedup.values())[:k]
+
+
+def _query_tokens(query: str) -> List[str]:
+    words = re.findall(r"[a-zA-Z0-9À-ÿ]{3,}", (query or "").lower())
+    stop = {
+        "the",
+        "and",
+        "for",
+        "with",
+        "what",
+        "who",
+        "you",
+        "your",
+        "les",
+        "des",
+        "est",
+        "une",
+        "dans",
+        "chno",
+        "chni",
+        "dyal",
+        "dial",
+        "badr",
+    }
+    uniq: List[str] = []
+    for w in words:
+        if w in stop:
+            continue
+        if w not in uniq:
+            uniq.append(w)
+    return uniq
 
 
 def format_chunks_for_prompt(chunks: List[RetrievedChunk]) -> str:

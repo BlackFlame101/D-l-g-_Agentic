@@ -43,3 +43,16 @@ test('direct user chat text messages are accepted', () => {
   };
   assert.equal(__testUtils.shouldProcessIncomingMessage(userMessage), true);
 });
+
+test('direct LID user chat messages are accepted', () => {
+  __testUtils.resetInboundMessageCaches();
+  const lidMessage = {
+    key: {
+      id: 'lid1',
+      remoteJid: '209585881280569:38@lid',
+      fromMe: false,
+    },
+    message: { conversation: 'hello from lid' },
+  };
+  assert.equal(__testUtils.shouldProcessIncomingMessage(lidMessage), true);
+});
