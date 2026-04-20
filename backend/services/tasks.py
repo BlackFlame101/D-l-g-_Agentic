@@ -17,6 +17,7 @@ from services.conversations import (
     get_or_create_conversation,
     insert_message,
     load_history,
+    reactivate_latest_agent_for_user,
     touch_session,
 )
 from services.documents import (
@@ -83,11 +84,27 @@ def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, An
     touch_session(payload.user_id)
 
     agent_row = get_active_agent_for_user(payload.user_id)
+    limit = None
     if agent_row is None:
         logger.warning("No active agent configured for user", extra=log_ctx)
-        return {"status": "no_agent"}
+        # If the user is otherwise allowed to reply, auto-recover from agent
+        # active-flag drift instead of silently dropping customer messages.
+        limit = check_subscription_limit(payload.user_id)
+        if limit.allowed:
+            agent_row = reactivate_latest_agent_for_user(payload.user_id)
+        if agent_row is None and not limit.allowed:
+            logger.info(
+                "Subscription blocked while agent missing; sending notice",
+                extra={**log_ctx, "reason": limit.reason},
+            )
+            _send_limit_notice(payload, limit.reason or "inactive")
+            return {"status": "blocked", "reason": limit.reason}
+        if agent_row is None:
+            logger.warning("No agent found after recovery attempt", extra=log_ctx)
+            return {"status": "no_agent"}
 
-    limit = check_subscription_limit(payload.user_id)
+    if limit is None:
+        limit = check_subscription_limit(payload.user_id)
     if not limit.allowed:
         logger.info(
             "Subscription blocked; sending notice",

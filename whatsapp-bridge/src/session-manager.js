@@ -85,6 +85,10 @@ import { checkRateLimit } from './rate-limiter.js';
 const sessions = new Map();
 const wsClients = new Map(); // WebSocket clients per userId
 const reconnectAttempts = new Map(); // Track reconnection attempts
+const processedInboundMessages = new Map(); // msgKey -> timestamp
+const lastNonTextReplyAt = new Map(); // `${userId}:${jid}` -> timestamp
+const DEDUP_TTL_MS = 5 * 60 * 1000;
+const NON_TEXT_REPLY_COOLDOWN_MS = 30 * 1000;
 
 /**
  * Session object structure
@@ -348,13 +352,52 @@ function setupEventHandlers(userId, socket, authState) {
     if (m.type !== 'notify') return;
     
     for (const msg of m.messages) {
-      // Skip status broadcasts and own messages
-      if (msg.key.remoteJid === 'status@broadcast') continue;
-      if (msg.key.fromMe) continue;
-      
+      if (!shouldProcessIncomingMessage(msg)) continue;
+      const dedupKey = getInboundDedupKey(msg);
+      if (isDuplicateInboundMessage(dedupKey)) {
+        continue;
+      }
       await handleIncomingMessage(userId, msg);
     }
   });
+}
+
+function shouldProcessIncomingMessage(msg) {
+  const remoteJid = msg?.key?.remoteJid || '';
+  if (!remoteJid) return false;
+  if (remoteJid === 'status@broadcast') return false;
+  if (msg?.key?.fromMe) return false;
+  // Ignore protocol/system payloads that are not actual user chat messages.
+  if (!msg?.message) return false;
+  if (msg.message?.protocolMessage) return false;
+  if (msg.message?.senderKeyDistributionMessage) return false;
+  if (msg.message?.messageContextInfo) return false;
+  // Process direct 1:1 chats only.
+  if (!remoteJid.endsWith('@s.whatsapp.net')) return false;
+  return true;
+}
+
+function getInboundDedupKey(msg) {
+  const remoteJid = msg?.key?.remoteJid || 'unknown';
+  const messageId = msg?.key?.id || '';
+  const timestamp = String(msg?.messageTimestamp || '');
+  return messageId ? `${remoteJid}:${messageId}` : `${remoteJid}:${timestamp}`;
+}
+
+function isDuplicateInboundMessage(key) {
+  if (!key) return false;
+  const now = Date.now();
+  const last = processedInboundMessages.get(key);
+  processedInboundMessages.set(key, now);
+  for (const [k, ts] of processedInboundMessages) {
+    if (now - ts > DEDUP_TTL_MS) processedInboundMessages.delete(k);
+  }
+  return !!last && now - last <= DEDUP_TTL_MS;
+}
+
+function resetInboundMessageCaches() {
+  processedInboundMessages.clear();
+  lastNonTextReplyAt.clear();
 }
 
 /**
@@ -414,6 +457,14 @@ async function handleIncomingMessage(userId, message) {
   
   // Handle non-text messages gracefully
   if (messageType !== 'text' || !messageContent) {
+    const nonTextKey = `${userId}:${senderJid}`;
+    const now = Date.now();
+    const last = lastNonTextReplyAt.get(nonTextKey) || 0;
+    if (now - last < NON_TEXT_REPLY_COOLDOWN_MS) {
+      log.debug({ from: senderPhone, messageType }, 'Skipping non-text fallback due to cooldown');
+      return;
+    }
+    lastNonTextReplyAt.set(nonTextKey, now);
     log.info({ messageType }, 'Sending non-text message response');
     
     const nonTextResponse = getLocalizedNonTextResponse(session);
@@ -743,6 +794,7 @@ export async function gracefulShutdown() {
   }
   
   sessions.clear();
+  resetInboundMessageCaches();
   logger.info('All sessions saved and closed');
 }
 
@@ -771,3 +823,10 @@ export async function restoreSessionsFromDb() {
     }
   }
 }
+
+export const __testUtils = {
+  shouldProcessIncomingMessage,
+  getInboundDedupKey,
+  isDuplicateInboundMessage,
+  resetInboundMessageCaches,
+};

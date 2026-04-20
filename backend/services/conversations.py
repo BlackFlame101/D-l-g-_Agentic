@@ -33,6 +33,42 @@ def get_active_agent_for_user(user_id: str) -> Optional[dict]:
     return resp.data[0] if resp.data else None
 
 
+def reactivate_latest_agent_for_user(user_id: str) -> Optional[dict]:
+    """Best-effort recovery when a user has no active agent due to state drift.
+
+    Returns the most recent non-deleted agent, reactivating it first when needed.
+    """
+    admin = get_admin_client()
+    resp = (
+        admin.table("agents")
+        .select("*")
+        .eq("user_id", user_id)
+        .is_("deleted_at", "null")
+        .order("updated_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not resp.data:
+        return None
+    row = resp.data[0]
+    if row.get("is_active"):
+        return row
+
+    updated = (
+        admin.table("agents")
+        .update({"is_active": True, "updated_at": datetime.now(timezone.utc).isoformat()})
+        .eq("id", row["id"])
+        .execute()
+    )
+    if not updated.data:
+        return None
+    logger.warning(
+        "Reactivated agent after active-state drift",
+        extra={"user_id": user_id, "agent_id": row["id"]},
+    )
+    return updated.data[0]
+
+
 def get_or_create_conversation(
     agent_id: str,
     contact_phone: str,
