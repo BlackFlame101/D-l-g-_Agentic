@@ -1,0 +1,24 @@
+name: Deploy Backend Railway
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-railway.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Trigger Railway Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Railway deployment webhook
+        env:
+          RAILWAY_DEPLOY_WEBHOOK_URL: ${{ secrets.RAILWAY_DEPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$RAILWAY_DEPLOY_WEBHOOK_URL" ]; then
+            echo "Missing required secret: RAILWAY_DEPLOY_WEBHOOK_URL"
+            exit 1
+          fi
+          curl -fsSL -X POST "$RAILWAY_DEPLOY_WEBHOOK_URL"
