@@ -130,6 +130,26 @@ npm run dev:backend    # Start FastAPI dev server
 npm run dev:celery     # Start Celery worker
 ```
 
+## GitHub CI/CD
+
+This repository now includes GitHub Actions workflows for CI and deployment:
+
+- `CI` (`.github/workflows/ci.yml`)
+  - Frontend production build (`frontend`)
+  - WhatsApp bridge tests (`whatsapp-bridge`)
+  - Backend sanity check (dependency install + Python module compile)
+- `Deploy Backend Railway` (`.github/workflows/deploy-railway.yml`)
+  - Triggers on pushes to `main` that touch `backend/**`
+  - Uses Railway deploy webhook secret
+- `Deploy WhatsApp Bridge Fly.io` (`.github/workflows/deploy-fly-bridge.yml`)
+  - Triggers on pushes to `main` that touch `whatsapp-bridge/**`
+  - Deploys via `flyctl` using your Fly API token
+
+Required repository secrets:
+
+- `RAILWAY_DEPLOY_WEBHOOK_URL`
+- `FLY_API_TOKEN`
+
 ### Celery Beat (Phase 6)
 
 Run the periodic scheduler in its own process — it dispatches daily

@@ -20,6 +20,13 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const RIB =
   process.env.NEXT_PUBLIC_PAYMENT_RIB || "XXX XXXX XXXX XXXX XXXX XX";
@@ -44,6 +51,7 @@ interface Subscription {
 interface Plan {
   id: string;
   name: string;
+  display_name?: string;
   message_limit: number;
   price_mad: number;
   features: string[];
@@ -54,6 +62,8 @@ export default function BillingPage() {
   const { user } = useUser();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
+  const [requestedPlanId, setRequestedPlanId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -78,6 +88,16 @@ export default function BillingPage() {
       if (sub) {
         setSubscription(sub);
         if (sub.plans) setPlan(sub.plans);
+      }
+      const { data: plans } = await supabase
+        .from("plans")
+        .select("id,name,display_name,message_limit,price_mad,features")
+        .eq("is_active", true)
+        .order("price_mad", { ascending: true });
+      const safePlans = (plans || []) as Plan[];
+      setAvailablePlans(safePlans);
+      if (safePlans.length > 0) {
+        setRequestedPlanId(safePlans[0].id);
       }
     } catch {
       // empty state
@@ -121,6 +141,17 @@ export default function BillingPage() {
   );
   const whatsappHref = SALES_WHATSAPP
     ? `https://wa.me/${SALES_WHATSAPP}?text=${contactMessage}`
+    : "#";
+  const requestedPlan =
+    availablePlans.find((p) => p.id === requestedPlanId) || availablePlans[0];
+  const activationRequestHref = SALES_WHATSAPP
+    ? `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(
+        `Hello, I want to activate a subscription for my account.\nUser ID: ${user?.id}\nRequested plan: ${
+          requestedPlan?.display_name || requestedPlan?.name || "N/A"
+        }\nMonthly price: ${requestedPlan?.price_mad ?? "N/A"} MAD\nMessage limit: ${
+          requestedPlan?.message_limit ?? "N/A"
+        }`
+      )}`
     : "#";
 
   if (loading) {
@@ -217,19 +248,49 @@ export default function BillingPage() {
               )}
             </div>
           ) : (
-            <div className="text-center py-6">
+            <div className="py-6 space-y-4">
+              <div className="rounded-lg border border-border bg-muted/30 p-4 text-left">
+                <p className="text-sm font-medium text-foreground">
+                  No active subscription
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Pick a plan and send an activation request. An admin will activate
+                  it from the dashboard.
+                </p>
+                {availablePlans.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-medium text-foreground">Requested plan</p>
+                    <Select
+                      value={requestedPlanId}
+                      onValueChange={(value) => setRequestedPlanId(value ?? "")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availablePlans.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.display_name || p.name} - {p.price_mad} MAD -{" "}
+                            {p.message_limit} msg
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">
                 {t("billing.noPlan")}
               </p>
               {SALES_WHATSAPP ? (
                 <a
-                  href={whatsappHref}
+                  href={activationRequestHref}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
                 >
                   <Phone className="h-4 w-4" />
-                  {t("billing.contactWhatsApp")}
+                  Request activation on WhatsApp
                 </a>
               ) : (
                 <Button className="mt-3 gap-2" disabled>
