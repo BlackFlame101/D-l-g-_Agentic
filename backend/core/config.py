@@ -3,9 +3,12 @@ Application configuration using Pydantic Settings.
 Loads from environment variables and .env file.
 """
 
+import json
 from functools import lru_cache
-from typing import List
+from typing import Any, List
+from urllib.parse import urlparse
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -69,6 +72,54 @@ class Settings(BaseSettings):
     # tests can flip them via environment variables per-test.
     test_llm_mode: str = ""  # "", "stub", "stub_fallback", "stub_error"
     test_embed_mode: str = ""  # "", "stub"
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value: Any) -> Any:
+        """Accept either a JSON list or a comma-separated string for CORS_ORIGINS.
+
+        Pydantic v2's default for ``List[str]`` only parses JSON. Users often
+        paste ``CORS_ORIGINS=https://a.com,https://b.com`` (CSV) or
+        ``CORS_ORIGINS=https://a.com`` (single value) into Railway/Vercel and
+        the app refuses to boot with an opaque ValidationError. Normalize both.
+        """
+        if value is None or isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            if stripped.startswith("["):
+                return json.loads(stripped)
+            return [item.strip() for item in stripped.split(",") if item.strip()]
+        return value
+
+    @field_validator("whatsapp_bridge_url", mode="before")
+    @classmethod
+    def _normalize_whatsapp_bridge_url(cls, value: Any) -> str:
+        """Normalize Railway/Fly style URL env vars into a valid base URL."""
+        if value is None:
+            return "http://localhost:3001"
+
+        raw = str(value).strip()
+        if not raw:
+            return "http://localhost:3001"
+
+        # Railway/Fly UI copy-paste sometimes includes wrapping quotes.
+        cleaned = raw.strip("'\"").rstrip("/")
+
+        # If host is provided without scheme, default to HTTPS for public bridge.
+        if "://" not in cleaned:
+            cleaned = f"https://{cleaned}"
+
+        parsed = urlparse(cleaned)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError(
+                "WHATSAPP_BRIDGE_URL must be a valid absolute http(s) URL, "
+                f'got "{value}"'
+            )
+
+        return cleaned
 
     @property
     def is_configured(self) -> bool:

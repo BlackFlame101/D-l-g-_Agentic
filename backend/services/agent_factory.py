@@ -9,7 +9,9 @@ in Supabase and replayed here; we do not rely on Agno's session storage.
 
 from __future__ import annotations
 
+import json
 import os
+import time
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -22,6 +24,40 @@ from services.gemini import approximate_token_count
 from services.rag import RetrievedChunk, format_chunks_for_prompt
 
 logger = get_logger(__name__)
+MAX_LLM_RETRIES = 3
+
+
+def _is_transient_model_error(text: str) -> bool:
+    lower = (text or "").lower()
+    return (
+        "503" in lower
+        or "unavailable" in lower
+        or "high demand" in lower
+        or "overloaded" in lower
+        or "resource exhausted" in lower
+        or "rate limit" in lower
+    )
+
+
+def _looks_like_provider_error_payload(content: str) -> bool:
+    raw = (content or "").strip()
+    if not raw:
+        return False
+
+    if raw.startswith("{") and '"error"' in raw.lower():
+        try:
+            parsed = json.loads(raw)
+            error_blob = parsed.get("error")
+            if isinstance(error_blob, dict):
+                code = str(error_blob.get("code", "")).strip()
+                status = str(error_blob.get("status", "")).strip()
+                message = str(error_blob.get("message", "")).strip()
+                return bool(code or status or message)
+        except Exception:
+            # If payload is malformed but clearly an error-shaped JSON,
+            # treat it as provider error to avoid leaking internals.
+            return True
+    return _is_transient_model_error(raw)
 
 
 LANGUAGE_INSTRUCTIONS = {
@@ -191,12 +227,42 @@ def generate_reply(
                 used_fallback=True,
             )
 
-    try:
-        agent = _build_agent(system_prompt)
-        input_messages = _build_input_messages(history, user_message)
-        result = agent.run(input=input_messages)
-    except Exception as exc:
-        logger.exception("Agno agent run failed", extra={"error": str(exc)})
+    result = None
+    agent = _build_agent(system_prompt)
+    input_messages = _build_input_messages(history, user_message)
+    for attempt in range(MAX_LLM_RETRIES):
+        try:
+            result = agent.run(input=input_messages)
+            break
+        except Exception as exc:
+            transient = _is_transient_model_error(str(exc))
+            if transient and attempt < MAX_LLM_RETRIES - 1:
+                wait_seconds = 2**attempt
+                logger.warning(
+                    "Agno agent transient failure; retrying",
+                    extra={"error": str(exc), "attempt": attempt + 1, "wait_seconds": wait_seconds},
+                )
+                time.sleep(wait_seconds)
+                continue
+            logger.exception(
+                "Agno agent run failed",
+                extra={"error": str(exc), "attempt": attempt + 1, "transient": transient},
+            )
+            return AgentReply(
+                content=fallback,
+                tokens_used=approximate_token_count(fallback),
+                input_tokens=0,
+                output_tokens=0,
+                used_fallback=True,
+            )
+
+    content = result.content if result and result.content else ""
+    if isinstance(content, list):
+        content = "\n".join(str(c) for c in content)
+    content = (content or "").strip()
+
+    if _looks_like_provider_error_payload(content):
+        logger.warning("Provider error payload detected in reply content; using fallback")
         return AgentReply(
             content=fallback,
             tokens_used=approximate_token_count(fallback),
@@ -204,11 +270,6 @@ def generate_reply(
             output_tokens=0,
             used_fallback=True,
         )
-
-    content = result.content if result and result.content else ""
-    if isinstance(content, list):
-        content = "\n".join(str(c) for c in content)
-    content = (content or "").strip()
 
     if not content:
         logger.warning("Agno returned empty content; using fallback")

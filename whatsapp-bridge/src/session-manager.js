@@ -367,13 +367,13 @@ function shouldProcessIncomingMessage(msg) {
   if (!remoteJid) return false;
   if (remoteJid === 'status@broadcast') return false;
   if (msg?.key?.fromMe) return false;
-  // Ignore protocol/system payloads that are not actual user chat messages.
   if (!msg?.message) return false;
   if (msg.message?.protocolMessage) return false;
   if (msg.message?.senderKeyDistributionMessage) return false;
-  if (msg.message?.messageContextInfo) return false;
-  // Process direct 1:1 chats only.
-  if (!remoteJid.endsWith('@s.whatsapp.net')) return false;
+  // REMOVED: if (msg.message?.messageContextInfo) return false;
+  const isDirectPhoneJid = remoteJid.endsWith('@s.whatsapp.net');
+  const isDirectLidJid = remoteJid.endsWith('@lid');
+  if (!isDirectPhoneJid && !isDirectLidJid) return false;
   return true;
 }
 
@@ -419,8 +419,13 @@ async function handleIncomingMessage(userId, message) {
     return;
   }
   
-  const senderJid = message.key.remoteJid;
-  const senderPhone = senderJid.split('@')[0];
+  const remoteJid = message?.key?.remoteJid || '';
+  const participantJid = message?.key?.participant || message?.participant || '';
+  // For LID-addressed chats, participant can carry a phone-style JID.
+  const senderJid =
+    (participantJid && participantJid !== remoteJid ? participantJid : remoteJid) ||
+    remoteJid;
+  const senderPhone = String(senderJid.split('@')[0] || '').replace(/\D/g, '');
   const senderName = message.pushName || senderPhone;
   
   // Extract message content
@@ -500,7 +505,8 @@ async function forwardToBackend(userId, messageData) {
   const log = createSessionLogger(userId);
   
   try {
-    const response = await fetch(`${config.backendUrl}/api/webhook/whatsapp`, {
+    const webhookUrl = new URL('/api/webhook/whatsapp', `${config.backendUrl}/`).toString();
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -24,7 +24,8 @@ def send_whatsapp_reply(user_id: str, to: str, message: str) -> None:
         logger.warning("Refusing to send empty WhatsApp reply", extra={"user_id": user_id})
         return
 
-    url = f"{settings.whatsapp_bridge_url.rstrip('/')}/api/session/{user_id}/send"
+    base_url = settings.whatsapp_bridge_url.rstrip("/")
+    url = f"{base_url}/api/session/{user_id}/send"
     headers = {
         "Content-Type": "application/json",
         "X-API-Secret": settings.whatsapp_bridge_api_secret,
@@ -35,13 +36,27 @@ def send_whatsapp_reply(user_id: str, to: str, message: str) -> None:
         with httpx.Client(timeout=15.0) as client:
             resp = client.post(url, json=payload, headers=headers)
     except httpx.HTTPError as exc:
-        logger.error("Bridge send failed", extra={"error": str(exc), "user_id": user_id})
+        logger.error(
+            "Bridge send failed",
+            extra={
+                "error": str(exc),
+                "user_id": user_id,
+                "bridge_url": base_url,
+                "target_url": url,
+            },
+        )
         raise BridgeError(str(exc)) from exc
 
     if resp.status_code >= 400:
         logger.error(
             "Bridge returned error",
-            extra={"status": resp.status_code, "body": resp.text, "user_id": user_id},
+            extra={
+                "status": resp.status_code,
+                "body": resp.text,
+                "user_id": user_id,
+                "bridge_url": base_url,
+                "target_url": url,
+            },
         )
         raise BridgeError(f"Bridge returned {resp.status_code}: {resp.text}")
 

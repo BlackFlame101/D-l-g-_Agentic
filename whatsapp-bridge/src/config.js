@@ -5,12 +5,28 @@
 
 import 'dotenv/config';
 
+function normalizeBaseUrl(value, fallback) {
+  const raw = String(value || fallback).trim();
+  const unquoted = raw.replace(/^['"]+|['"]+$/g, '').trim();
+  return unquoted.replace(/\/+$/, '');
+}
+
+const rawBackendUrl = process.env.BACKEND_URL;
+const normalizedBackendUrl = normalizeBaseUrl(rawBackendUrl, 'http://localhost:8000');
+
+if (rawBackendUrl && rawBackendUrl !== normalizedBackendUrl) {
+  console.warn(
+    `[config] BACKEND_URL was normalized from "${rawBackendUrl}" to "${normalizedBackendUrl}". ` +
+    'Remove wrapping quotes/trailing slash in Fly secrets to avoid URL issues.'
+  );
+}
+
 export const config = {
   // Server
   port: parseInt(process.env.PORT || '3001', 10),
   
   // Backend API
-  backendUrl: process.env.BACKEND_URL || 'http://localhost:8000',
+  backendUrl: normalizedBackendUrl,
   
   // API Authentication (shared secret with backend)
   apiSecret: process.env.API_SECRET || 'dev-secret-change-in-production',
@@ -70,5 +86,14 @@ export function validateConfig() {
   
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+
+  try {
+    const parsed = new URL(config.backendUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error(`Unsupported protocol "${parsed.protocol}"`);
+    }
+  } catch (error) {
+    throw new Error(`Invalid BACKEND_URL "${config.backendUrl}": ${error.message}`);
   }
 }
