@@ -262,7 +262,7 @@ export default function BillingPage() {
                     <p className="text-xs font-medium text-foreground">Requested plan</p>
                     <Select
                       value={requestedPlanId}
-                      onValueChange={(value) => setRequestedPlanId(value)}
+                      onValueChange={(value) => setRequestedPlanId(value ?? "")}
                     >
                       <SelectTrigger>
                         <SelectValue />
