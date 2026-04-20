@@ -422,6 +422,12 @@ async function handleIncomingMessage(userId, message) {
   const senderJid = message.key.remoteJid;
   const senderPhone = senderJid.split('@')[0];
   const senderName = message.pushName || senderPhone;
+  const ownPhoneDigits = String(session.phoneNumber || '').replace(/\D/g, '');
+  const senderDigits = String(senderPhone || '').replace(/\D/g, '');
+  if (ownPhoneDigits && senderDigits && ownPhoneDigits === senderDigits) {
+    log.debug({ senderPhone }, 'Ignoring self-chat message');
+    return;
+  }
   
   // Extract message content
   let messageContent = null;

@@ -22,4 +22,9 @@ jobs:
       - name: Deploy
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy --remote-only --config "whatsapp-bridge/fly.toml" --dockerfile "whatsapp-bridge/Dockerfile"
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "Missing required secret: FLY_API_TOKEN"
+            exit 1
+          fi
+          flyctl deploy --remote-only --config "whatsapp-bridge/fly.toml" --dockerfile "whatsapp-bridge/Dockerfile"

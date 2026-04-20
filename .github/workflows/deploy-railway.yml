@@ -21,4 +21,5 @@ jobs:
             echo "Missing required secret: RAILWAY_DEPLOY_WEBHOOK_URL"
             exit 1
           fi
-          curl -fsSL -X POST "$RAILWAY_DEPLOY_WEBHOOK_URL"
+          # Some Railway deploy hooks accept GET only (POST returns 405).
+          curl -fsSL -X POST "$RAILWAY_DEPLOY_WEBHOOK_URL" || curl -fsSL "$RAILWAY_DEPLOY_WEBHOOK_URL"
