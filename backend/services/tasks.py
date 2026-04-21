@@ -14,9 +14,14 @@ from services.agent_factory import generate_reply
 from services.bridge import BridgeError, send_whatsapp_reply
 from services.conversations import (
     get_active_agent_for_user,
+    get_conversation_by_id,
+    get_user_profile,
     get_or_create_conversation,
+    has_message_with_whatsapp_id,
     insert_message,
+    is_conversation_paused,
     load_history,
+    mark_owner_alerted,
     reactivate_latest_agent_for_user,
     touch_session,
 )
@@ -81,6 +86,10 @@ def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, An
         logger.info("Ignoring non-text message in worker", extra=log_ctx)
         return {"status": "ignored_non_text"}
 
+    if has_message_with_whatsapp_id(payload.message_id):
+        logger.info("Duplicate message skipped in worker", extra=log_ctx)
+        return {"status": "duplicate_skipped"}
+
     touch_session(payload.user_id)
 
     agent_row = get_active_agent_for_user(payload.user_id)
@@ -118,6 +127,17 @@ def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, An
         contact_phone=payload.sender_phone,
         contact_name=payload.sender_name,
     )
+    if is_conversation_paused(conversation["id"]):
+        logger.info("Conversation paused, skipping agent reply", extra=log_ctx)
+        return {"status": "paused", "conversation_id": conversation["id"]}
+
+    if is_new:
+        _notify_owner_new_conversation(
+            user_id=payload.user_id,
+            contact_name=payload.sender_name,
+            contact_phone=payload.sender_phone,
+            conversation_id=conversation["id"],
+        )
 
     user_message_text = payload.message_content.strip()
     insert_message(
@@ -129,6 +149,13 @@ def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, An
             "whatsapp_message_id": payload.message_id,
             "timestamp": payload.timestamp,
         },
+    )
+    _maybe_notify_owner_long_conversation(
+        user_id=payload.user_id,
+        agent_row=agent_row,
+        conversation_id=conversation["id"],
+        contact_name=payload.sender_name,
+        contact_phone=payload.sender_phone,
     )
 
     if is_new and (agent_row.get("greeting_message") or "").strip():
@@ -211,6 +238,99 @@ def _send_limit_notice(payload: WhatsAppWebhookPayload, reason: str) -> None:
         logger.warning(
             "Could not send limit notice",
             extra={"user_id": payload.user_id, "error": str(exc)},
+        )
+
+
+def _notify_owner_new_conversation(
+    user_id: str,
+    contact_name: str | None,
+    contact_phone: str,
+    conversation_id: str,
+) -> None:
+    """Best-effort owner notification for first-ever messages in a conversation."""
+    profile = get_user_profile(user_id)
+    owner_phone = (profile or {}).get("phone")
+    if not owner_phone:
+        return
+
+    owner_name = ((profile or {}).get("full_name") or "").strip()
+    contact_label = (contact_name or "").strip() or contact_phone
+    try:
+        owner_jid = _phone_to_jid(owner_phone)
+    except ValueError:
+        return
+
+    prefix = f"Hi {owner_name}, " if owner_name else "Hi, "
+    text = (
+        f"{prefix}new customer conversation started with {contact_label}. "
+        f"Open it in your dashboard: /dashboard/conversations/{conversation_id}"
+    )
+    try:
+        send_whatsapp_reply(user_id, owner_jid, text)
+    except BridgeError as exc:  # pragma: no cover - best effort
+        logger.warning(
+            "Could not send new conversation notification",
+            extra={"user_id": user_id, "error": str(exc)},
+        )
+
+
+def _maybe_notify_owner_long_conversation(
+    user_id: str,
+    agent_row: dict,
+    conversation_id: str,
+    contact_name: str | None,
+    contact_phone: str,
+) -> None:
+    """Send one alert when a conversation exceeds duration or message thresholds."""
+    conversation = get_conversation_by_id(conversation_id)
+    if not conversation:
+        return
+    if bool(conversation.get("owner_alerted")):
+        return
+
+    created_raw = conversation.get("created_at")
+    if not created_raw:
+        return
+    try:
+        created_at = datetime.fromisoformat(str(created_raw).replace("Z", "+00:00"))
+    except ValueError:
+        return
+
+    message_count = int(conversation.get("message_count") or 0)
+    duration_minutes = max(
+        0, int((datetime.now(timezone.utc) - created_at).total_seconds() // 60)
+    )
+    msg_threshold = int(agent_row.get("alert_message_threshold") or 10)
+    minutes_threshold = int(agent_row.get("alert_duration_minutes") or 15)
+
+    if message_count < msg_threshold and duration_minutes < minutes_threshold:
+        return
+
+    profile = get_user_profile(user_id)
+    owner_phone = (profile or {}).get("phone")
+    if not owner_phone:
+        return
+
+    owner_name = ((profile or {}).get("full_name") or "").strip()
+    contact_label = (contact_name or "").strip() or contact_phone
+    try:
+        owner_jid = _phone_to_jid(owner_phone)
+    except ValueError:
+        return
+
+    prefix = f"Hi {owner_name}, " if owner_name else "Hi, "
+    text = (
+        f"{prefix}a conversation with {contact_label} is still active "
+        f"({message_count} messages, {duration_minutes} minutes). "
+        f"Check it here: /dashboard/conversations/{conversation_id}"
+    )
+    try:
+        send_whatsapp_reply(user_id, owner_jid, text)
+        mark_owner_alerted(conversation_id)
+    except BridgeError as exc:  # pragma: no cover - best effort
+        logger.warning(
+            "Could not send long conversation notification",
+            extra={"user_id": user_id, "error": str(exc)},
         )
 
 

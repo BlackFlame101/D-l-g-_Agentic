@@ -21,7 +21,9 @@ export default function ConversationDetailPage() {
   const convId = params.id as string;
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [updatingPause, setUpdatingPause] = useState(false);
 
   useEffect(() => {
     if (!user || !convId) return;
@@ -31,12 +33,26 @@ export default function ConversationDetailPage() {
   async function loadMessages() {
     setLoading(true);
     try {
+      const list = await conversationsApi.list({ limit: 200 });
+      const conv = list.find((c) => c.id === convId) || null;
+      setConversation(conv);
       const data = await conversationsApi.messages(convId, { limit: 200 });
       setMessages(data);
     } catch {
       // empty
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function togglePause() {
+    if (!conversation || updatingPause) return;
+    setUpdatingPause(true);
+    try {
+      const updated = await conversationsApi.updatePause(convId, !conversation.is_paused);
+      setConversation(updated);
+    } finally {
+      setUpdatingPause(false);
     }
   }
 
@@ -56,6 +72,11 @@ export default function ConversationDetailPage() {
           <p className="text-xs text-muted-foreground">
             {messages.length} {t("messages")} · {t("conversations.readOnly")}
           </p>
+        </div>
+        <div className="ms-auto">
+          <Button variant={conversation?.is_paused ? "default" : "outline"} onClick={togglePause} disabled={!conversation || updatingPause}>
+            {conversation?.is_paused ? "Resume Agent" : "Pause Agent"}
+          </Button>
         </div>
       </div>
 

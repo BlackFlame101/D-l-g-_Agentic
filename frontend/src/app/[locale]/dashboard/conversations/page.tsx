@@ -13,6 +13,15 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Search, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
+const LONG_CONVERSATION_MESSAGE_THRESHOLD = 10;
+const LONG_CONVERSATION_DURATION_THRESHOLD_MINUTES = 15;
+
+function minutesSince(value?: string | null): number {
+  if (!value) return 0;
+  const ms = Date.now() - new Date(value).getTime();
+  return Math.max(0, Math.floor(ms / 60000));
+}
+
 export default function ConversationsPage() {
   const t = useTranslations("Dashboard");
   const locale = useLocale();
@@ -91,11 +100,18 @@ export default function ConversationsPage() {
       ) : (
         <Card>
           <CardContent className="divide-y divide-border p-0">
-            {filtered.map((conv) => (
+            {filtered.map((conv) => {
+              const durationMins = minutesSince(conv.created_at);
+              const isLong =
+                (conv.message_count ?? 0) >= LONG_CONVERSATION_MESSAGE_THRESHOLD ||
+                durationMins >= LONG_CONVERSATION_DURATION_THRESHOLD_MINUTES;
+              return (
               <Link
                 key={conv.id}
                 href={`/${locale}/dashboard/conversations/${conv.id}`}
-                className="flex items-center gap-4 p-4 transition-colors hover:bg-muted"
+                className={`flex items-center gap-4 p-4 transition-colors hover:bg-muted ${
+                  isLong ? "bg-amber-50/60 dark:bg-amber-950/20" : ""
+                }`}
               >
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary/20 text-sm font-bold text-secondary">
                   {(conv.contact_name || conv.contact_phone)
@@ -110,10 +126,15 @@ export default function ConversationsPage() {
                     <Badge variant="outline" className="shrink-0 text-xs">
                       {conv.status}
                     </Badge>
+                    {isLong && (
+                      <Badge variant="secondary" className="shrink-0 text-xs">
+                        Attention
+                      </Badge>
+                    )}
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {conv.contact_phone} · {conv.message_count}{" "}
-                    {t("messages")}
+                    {t("messages")} · {durationMins} min
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -128,7 +149,8 @@ export default function ConversationsPage() {
                   <ChevronRight className="h-4 w-4" />
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       )}

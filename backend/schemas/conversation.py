@@ -17,6 +17,7 @@ class ConversationOut(BaseModel):
     contact_phone: str
     contact_name: Optional[str] = None
     status: Optional[str] = None
+    is_paused: Optional[bool] = False
     message_count: Optional[int] = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -33,3 +34,7 @@ class MessageOut(BaseModel):
     tokens_used: Optional[int] = 0
     metadata: Optional[dict[str, Any]] = None
     created_at: Optional[datetime] = None
+
+
+class ConversationPauseUpdate(BaseModel):
+    is_paused: bool

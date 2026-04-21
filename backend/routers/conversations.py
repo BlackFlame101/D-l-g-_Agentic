@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from core.logging import get_logger
 from core.security import CurrentUser, get_current_user
-from schemas.conversation import ConversationOut, MessageOut
+from schemas.conversation import ConversationOut, ConversationPauseUpdate, MessageOut
 from services.supabase import get_admin_client
 
 logger = get_logger(__name__)
@@ -104,3 +104,35 @@ async def get_conversation_messages(
     resp = query.execute()
     rows = list(reversed(resp.data or []))
     return [MessageOut.model_validate(r) for r in rows]
+
+
+@router.patch("/{conv_id}", response_model=ConversationOut)
+async def update_conversation_pause(
+    conv_id: UUID,
+    body: ConversationPauseUpdate,
+    user: CurrentUser = Depends(get_current_user),
+) -> ConversationOut:
+    """Pause/resume one conversation for manual human handoff."""
+    admin = get_admin_client()
+    conv = (
+        admin.table("conversations")
+        .select("*")
+        .eq("id", str(conv_id))
+        .limit(1)
+        .execute()
+    )
+    if not conv.data or conv.data[0].get("deleted_at") is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+    if not _user_owns_agent(conv.data[0]["agent_id"], user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+
+    next_status = "paused" if body.is_paused else "active"
+    updated = (
+        admin.table("conversations")
+        .update({"is_paused": body.is_paused, "status": next_status})
+        .eq("id", str(conv_id))
+        .execute()
+    )
+    if not updated.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Update failed.")
+    return ConversationOut.model_validate(updated.data[0])

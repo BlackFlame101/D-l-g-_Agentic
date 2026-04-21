@@ -352,6 +352,18 @@ function setupEventHandlers(userId, socket, authState) {
     if (m.type !== 'notify') return;
     
     for (const msg of m.messages) {
+      if (msg?.key?.fromMe) {
+        const remoteJid = msg?.key?.remoteJid || '';
+        if (remoteJid && !remoteJid.endsWith('@g.us') && remoteJid !== 'status@broadcast') {
+          const senderPhone = String(remoteJid.split('@')[0] || '').replace(/\D/g, '');
+          await notifyTakeoverToBackend(userId, {
+            userId,
+            senderPhone,
+            senderName: msg.pushName || senderPhone,
+          });
+        }
+        continue;
+      }
       if (!shouldProcessIncomingMessage(msg)) continue;
       const dedupKey = getInboundDedupKey(msg);
       if (isDuplicateInboundMessage(dedupKey)) {
@@ -420,6 +432,10 @@ async function handleIncomingMessage(userId, message) {
   }
   
   const remoteJid = message?.key?.remoteJid || '';
+  if (!remoteJid || remoteJid.endsWith('@g.us')) {
+    log.debug({ remoteJid }, 'Ignoring group message');
+    return;
+  }
   const participantJid = message?.key?.participant || message?.participant || '';
   // For LID-addressed chats, participant can carry a phone-style JID.
   const senderJid =
@@ -552,6 +568,10 @@ export async function sendMessage(userId, to, text) {
   const jid = to.includes('@') ? to : `${to}@s.whatsapp.net`;
   
   try {
+    const typingDelayMs = simulateTypingDelay(text);
+    await session.socket.sendPresenceUpdate('composing', jid);
+    await new Promise((resolve) => setTimeout(resolve, typingDelayMs));
+    await session.socket.sendPresenceUpdate('paused', jid);
     const result = await session.socket.sendMessage(jid, { text });
     log.info({ to: jid.split('@')[0], messageId: result?.key?.id }, 'Message sent');
     
@@ -563,6 +583,32 @@ export async function sendMessage(userId, to, text) {
   } catch (error) {
     log.error({ error: error.message, to }, 'Failed to send message');
     return { success: false, error: error.message };
+  }
+}
+
+function simulateTypingDelay(text) {
+  const content = String(text || '');
+  // Mimic natural typing speed with a small lower bound.
+  return Math.max(1000, Math.min((content.length / 200) * 1000, 4000));
+}
+
+async function notifyTakeoverToBackend(userId, payload) {
+  const log = createSessionLogger(userId);
+  try {
+    const webhookUrl = new URL('/api/webhook/whatsapp/takeover', `${config.backendUrl}/`).toString();
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Secret': config.apiSecret,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      log.warn({ status: response.status }, 'Takeover webhook returned non-OK');
+    }
+  } catch (error) {
+    log.warn({ error: error.message }, 'Failed to send takeover webhook');
   }
 }
 

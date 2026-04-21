@@ -148,6 +148,7 @@ export interface Conversation {
   contact_phone: string;
   contact_name: string | null;
   status: string;
+  is_paused?: boolean;
   message_count: number;
   created_at: string;
   updated_at: string | null;
@@ -182,6 +183,11 @@ export const conversationsApi = {
       `/api/conversations/${convId}/messages${qs ? `?${qs}` : ""}`
     );
   },
+  updatePause: (convId: string, is_paused: boolean) =>
+    request<Conversation>(`/api/conversations/${convId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_paused }),
+    }),
 };
 
 // -- WhatsApp Bridge --

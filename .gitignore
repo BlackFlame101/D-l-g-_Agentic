@@ -8,6 +8,7 @@
 
 # ===== Project scope (private) =====
 scope.md
+Future.md
 
 # ===== Python (backend) =====
 __pycache__/

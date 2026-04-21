@@ -138,6 +138,99 @@ def insert_message(
     return resp.data[0]
 
 
+def has_message_with_whatsapp_id(whatsapp_message_id: Optional[str]) -> bool:
+    """Return True if a message with this WhatsApp message id already exists."""
+    msg_id = (whatsapp_message_id or "").strip()
+    if not msg_id:
+        return False
+    admin = get_admin_client()
+    resp = (
+        admin.table("messages")
+        .select("id")
+        .contains("metadata", {"whatsapp_message_id": msg_id})
+        .limit(1)
+        .execute()
+    )
+    return bool(resp.data)
+
+
+def pause_conversation_for_human_takeover(
+    agent_id: str,
+    contact_phone: str,
+    contact_name: Optional[str] = None,
+) -> None:
+    """Mark a conversation paused when the business owner takes over manually."""
+    admin = get_admin_client()
+    conversation, _ = get_or_create_conversation(
+        agent_id=agent_id,
+        contact_phone=contact_phone,
+        contact_name=contact_name,
+    )
+    admin.table("conversations").update(
+        {
+            "is_paused": True,
+            "status": "paused",
+            "last_message_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("id", conversation["id"]).execute()
+
+
+def is_conversation_paused(conversation_id: str) -> bool:
+    """Read pause state for a conversation (safe when column is absent)."""
+    admin = get_admin_client()
+    try:
+        resp = (
+            admin.table("conversations")
+            .select("is_paused")
+            .eq("id", conversation_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        return False
+    if not resp.data:
+        return False
+    return bool(resp.data[0].get("is_paused"))
+
+
+def get_user_profile(user_id: str) -> Optional[dict]:
+    """Return basic user profile needed for owner notifications."""
+    admin = get_admin_client()
+    resp = (
+        admin.table("users")
+        .select("id, full_name, company_name, phone")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def get_conversation_by_id(conversation_id: str) -> Optional[dict]:
+    """Return one conversation row by id."""
+    admin = get_admin_client()
+    resp = (
+        admin.table("conversations")
+        .select("*")
+        .eq("id", conversation_id)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def mark_owner_alerted(conversation_id: str) -> None:
+    """Mark a conversation as already owner-alerted (best effort)."""
+    admin = get_admin_client()
+    try:
+        admin.table("conversations").update({"owner_alerted": True}).eq(
+            "id", conversation_id
+        ).execute()
+    except Exception:
+        # Column may not exist yet in some environments.
+        return
+
+
 def load_history(
     conversation_id: str,
     limit: Optional[int] = None,
