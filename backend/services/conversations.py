@@ -169,7 +169,6 @@ def pause_conversation_for_human_takeover(
     admin.table("conversations").update(
         {
             "is_paused": True,
-            "status": "paused",
             "last_message_at": datetime.now(timezone.utc).isoformat(),
         }
     ).eq("id", conversation["id"]).execute()

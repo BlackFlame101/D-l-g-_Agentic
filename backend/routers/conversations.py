@@ -126,10 +126,9 @@ async def update_conversation_pause(
     if not _user_owns_agent(conv.data[0]["agent_id"], user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
 
-    next_status = "paused" if body.is_paused else "active"
     updated = (
         admin.table("conversations")
-        .update({"is_paused": body.is_paused, "status": next_status})
+        .update({"is_paused": body.is_paused})
         .eq("id", str(conv_id))
         .execute()
     )

@@ -102,6 +102,7 @@ export default function ConversationsPage() {
           <CardContent className="divide-y divide-border p-0">
             {filtered.map((conv) => {
               const durationMins = minutesSince(conv.created_at);
+              const statusLabel = conv.is_paused ? "paused" : (conv.status || "active");
               const isLong =
                 (conv.message_count ?? 0) >= LONG_CONVERSATION_MESSAGE_THRESHOLD ||
                 durationMins >= LONG_CONVERSATION_DURATION_THRESHOLD_MINUTES;
@@ -124,7 +125,7 @@ export default function ConversationsPage() {
                       {conv.contact_name || conv.contact_phone}
                     </p>
                     <Badge variant="outline" className="shrink-0 text-xs">
-                      {conv.status}
+                      {statusLabel}
                     </Badge>
                     {isLong && (
                       <Badge variant="secondary" className="shrink-0 text-xs">
