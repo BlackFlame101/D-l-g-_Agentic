@@ -7,6 +7,7 @@ import { useUser } from "@/hooks/use-user";
 import { conversationsApi } from "@/lib/api";
 import type { Message, Conversation } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Bot, User } from "lucide-react";
@@ -24,6 +25,9 @@ export default function ConversationDetailPage() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingPause, setUpdatingPause] = useState(false);
+  const isPaused = Boolean(
+    conversation && (conversation.is_paused || conversation.status === "paused")
+  );
 
   useEffect(() => {
     if (!user || !convId) return;
@@ -69,13 +73,24 @@ export default function ConversationDetailPage() {
           <h1 className="font-heading text-base font-semibold text-foreground">
             {t("conversations.detail")}
           </h1>
-          <p className="text-xs text-muted-foreground">
-            {messages.length} {t("messages")} · {t("conversations.readOnly")}
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-xs text-muted-foreground">
+              {messages.length} {t("messages")} · {t("conversations.readOnly")}
+            </p>
+            {conversation && (
+              <Badge variant={isPaused ? "secondary" : "outline"} className="text-[10px]">
+                {isPaused ? "Paused" : "Active"}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="ms-auto">
-          <Button variant={conversation?.is_paused ? "default" : "outline"} onClick={togglePause} disabled={!conversation || updatingPause}>
-            {conversation?.is_paused ? "Resume Agent" : "Pause Agent"}
+          <Button
+            variant={isPaused ? "default" : "outline"}
+            onClick={togglePause}
+            disabled={!conversation || updatingPause}
+          >
+            {isPaused ? "Resume Agent" : "Pause Agent"}
           </Button>
         </div>
       </div>

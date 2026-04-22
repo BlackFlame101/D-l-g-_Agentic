@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from core.logging import get_logger
 from core.webhook_auth import verify_bridge_secret
@@ -27,6 +27,15 @@ class WhatsAppTakeoverPayload(BaseModel):
     user_id: str = Field(alias="userId")
     sender_phone: str = Field(alias="senderPhone")
     sender_name: str | None = Field(default=None, alias="senderName")
+    sender_jid: str | None = Field(default=None, alias="senderJid")
+
+    @field_validator("sender_phone", mode="before")
+    @classmethod
+    def normalize_sender_phone(cls, value: str) -> str:
+        digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+        if digits.startswith("0"):
+            digits = "212" + digits[1:]
+        return digits
 
 
 @router.post(

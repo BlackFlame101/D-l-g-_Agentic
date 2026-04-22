@@ -90,6 +90,13 @@ const lastNonTextReplyAt = new Map(); // `${userId}:${jid}` -> timestamp
 const DEDUP_TTL_MS = 5 * 60 * 1000;
 const NON_TEXT_REPLY_COOLDOWN_MS = 30 * 1000;
 
+function normalizePhone(phone) {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (digits.startsWith('212')) return digits;
+  if (digits.startsWith('0')) return `212${digits.slice(1)}`;
+  return digits;
+}
+
 /**
  * Session object structure
  * @typedef {Object} Session
@@ -355,11 +362,12 @@ function setupEventHandlers(userId, socket, authState) {
       if (msg?.key?.fromMe) {
         const remoteJid = msg?.key?.remoteJid || '';
         if (remoteJid && !remoteJid.endsWith('@g.us') && remoteJid !== 'status@broadcast') {
-          const senderPhone = String(remoteJid.split('@')[0] || '').replace(/\D/g, '');
+          const senderPhone = normalizePhone(remoteJid.split('@')[0] || '');
           await notifyTakeoverToBackend(userId, {
             userId,
             senderPhone,
             senderName: msg.pushName || senderPhone,
+            senderJid: remoteJid,
           });
         }
         continue;
@@ -441,7 +449,7 @@ async function handleIncomingMessage(userId, message) {
   const senderJid =
     (participantJid && participantJid !== remoteJid ? participantJid : remoteJid) ||
     remoteJid;
-  const senderPhone = String(senderJid.split('@')[0] || '').replace(/\D/g, '');
+  const senderPhone = normalizePhone(senderJid.split('@')[0] || '');
   const senderName = message.pushName || senderPhone;
   
   // Extract message content
@@ -566,6 +574,7 @@ export async function sendMessage(userId, to, text) {
   
   // Ensure JID format
   const jid = to.includes('@') ? to : `${to}@s.whatsapp.net`;
+  log.info({ jid, text }, 'Sending message via bridge');
   
   try {
     const typingDelayMs = simulateTypingDelay(text);

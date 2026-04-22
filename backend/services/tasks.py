@@ -22,7 +22,6 @@ from services.conversations import (
     is_conversation_paused,
     load_history,
     mark_owner_alerted,
-    reactivate_latest_agent_for_user,
     touch_session,
 )
 from services.documents import (
@@ -93,27 +92,11 @@ def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, An
     touch_session(payload.user_id)
 
     agent_row = get_active_agent_for_user(payload.user_id)
-    limit = None
     if agent_row is None:
         logger.warning("No active agent configured for user", extra=log_ctx)
-        # If the user is otherwise allowed to reply, auto-recover from agent
-        # active-flag drift instead of silently dropping customer messages.
-        limit = check_subscription_limit(payload.user_id)
-        if limit.allowed:
-            agent_row = reactivate_latest_agent_for_user(payload.user_id)
-        if agent_row is None and not limit.allowed:
-            logger.info(
-                "Subscription blocked while agent missing; sending notice",
-                extra={**log_ctx, "reason": limit.reason},
-            )
-            _send_limit_notice(payload, limit.reason or "inactive")
-            return {"status": "blocked", "reason": limit.reason}
-        if agent_row is None:
-            logger.warning("No agent found after recovery attempt", extra=log_ctx)
-            return {"status": "no_agent"}
+        return {"status": "no_agent"}
 
-    if limit is None:
-        limit = check_subscription_limit(payload.user_id)
+    limit = check_subscription_limit(payload.user_id)
     if not limit.allowed:
         logger.info(
             "Subscription blocked; sending notice",
@@ -267,7 +250,7 @@ def _notify_owner_new_conversation(
     )
     try:
         send_whatsapp_reply(user_id, owner_jid, text)
-    except BridgeError as exc:  # pragma: no cover - best effort
+    except Exception as exc:  # pragma: no cover - best effort
         logger.warning(
             "Could not send new conversation notification",
             extra={"user_id": user_id, "error": str(exc)},
@@ -327,7 +310,7 @@ def _maybe_notify_owner_long_conversation(
     try:
         send_whatsapp_reply(user_id, owner_jid, text)
         mark_owner_alerted(conversation_id)
-    except BridgeError as exc:  # pragma: no cover - best effort
+    except Exception as exc:  # pragma: no cover - best effort
         logger.warning(
             "Could not send long conversation notification",
             extra={"user_id": user_id, "error": str(exc)},
@@ -467,6 +450,8 @@ def _phone_to_jid(phone: str) -> str:
     digits = re.sub(r"\D", "", phone or "")
     if not digits:
         raise ValueError("Empty phone number")
+    if digits.startswith("0"):
+        digits = "212" + digits[1:]
     return f"{digits}@s.whatsapp.net"
 
 

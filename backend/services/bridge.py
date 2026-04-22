@@ -31,6 +31,10 @@ def send_whatsapp_reply(user_id: str, to: str, message: str) -> None:
         "X-API-Secret": settings.whatsapp_bridge_api_secret,
     }
     payload = {"to": to, "message": message}
+    logger.info(
+        "Sending WhatsApp message",
+        extra={"user_id": user_id, "target_url": url, "payload": payload},
+    )
 
     try:
         with httpx.Client(timeout=15.0) as client:

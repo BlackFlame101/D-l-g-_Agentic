@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _normalize_phone(value: str) -> str:
+    digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+    if digits.startswith("0"):
+        digits = "212" + digits[1:]
+    return digits
 
 
 class WhatsAppWebhookPayload(BaseModel):
@@ -25,6 +32,11 @@ class WhatsAppWebhookPayload(BaseModel):
     message_type: str = Field(alias="messageType")
     message_id: Optional[str] = Field(default=None, alias="messageId")
     timestamp: Optional[int] = None
+
+    @field_validator("sender_phone", mode="before")
+    @classmethod
+    def normalize_sender_phone(cls, value: str) -> str:
+        return _normalize_phone(value)
 
 
 class WebhookAck(BaseModel):
