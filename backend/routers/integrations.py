@@ -25,10 +25,12 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
 # Redis client — reuse the same URL already in settings
-import redis
+import redis as redis_lib
 
-_redis = redis.from_url(settings.redis_url, decode_responses=True)
 _OAUTH_STATE_TTL = 600  # 10 minutes
+
+def _get_redis():
+    return redis_lib.from_url(settings.redis_url, decode_responses=True)
 
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
@@ -150,10 +152,10 @@ async def shopify_oauth_callback(
 
     # 2. Verify state and retrieve user_id
     redis_key = f"shopify_oauth_state:{state}"
-    user_id = _redis.get(redis_key)
+    user_id = _get_redis().get(redis_key)
     if not user_id:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state.")
-    _redis.delete(redis_key)
+    _get_redis().delete(redis_key)
 
     # 3. Exchange code for permanent access token
     async with httpx.AsyncClient() as client:
