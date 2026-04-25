@@ -18,6 +18,7 @@ from core.logging import configure_logging, get_logger
 from routers import admin as admin_router
 from routers import agents as agents_router
 from routers import conversations as conversations_router
+from routers import integrations as integrations_router
 from routers import knowledge as knowledge_router
 from routers import webhook as webhook_router
 
@@ -123,6 +124,7 @@ app.include_router(webhook_router.router)
 app.include_router(agents_router.router)
 app.include_router(knowledge_router.router)
 app.include_router(conversations_router.router)
+app.include_router(integrations_router.router)
 app.include_router(admin_router.router)
 
 

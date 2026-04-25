@@ -67,6 +67,7 @@ class Settings(BaseSettings):
 
     # Storage
     knowledge_bucket: str = "knowledge-files"
+    integration_encryption_key: str = ""
 
     # Test harness knobs (never set in production). Read at call time so
     # tests can flip them via environment variables per-test.

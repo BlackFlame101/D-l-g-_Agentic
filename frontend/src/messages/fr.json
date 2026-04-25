@@ -143,6 +143,7 @@
       "knowledge": "Base de connaissances",
       "whatsapp": "WhatsApp",
       "conversations": "Conversations",
+      "integrations": "Intégrations",
       "billing": "Facturation",
       "settings": "Paramètres"
     },
@@ -296,6 +297,22 @@
       "confirmDelete": "Supprimer mon compte",
       "accountDeleted": "Compte supprimé."
     },
+    "integrations": {
+      "title": "Intégrations",
+      "description": "Connectez des services externes que votre agent IA peut utiliser.",
+      "storeUrl": "URL de la boutique Shopify",
+      "accessToken": "Token d'accès Admin API",
+      "tokenHint": "Votre token est chiffré au repos et toujours masqué dans le dashboard.",
+      "connect": "Connecter Shopify",
+      "update": "Mettre à jour les identifiants",
+      "disconnect": "Déconnecter",
+      "connected": "Intégration Shopify enregistrée.",
+      "disconnected": "Intégration Shopify déconnectée.",
+      "notConnected": "Non connecté",
+      "pending": "En attente d'activation",
+      "active": "Actif",
+      "pendingHelp": "Vos identifiants sont enregistrés. Un admin doit activer l'intégration avant que l'IA puisse l'utiliser."
+    },
     "errors": {
       "loadAgent": "Échec du chargement de la configuration de l'agent.",
       "saveAgent": "Échec de l'enregistrement de l'agent.",
@@ -305,7 +322,10 @@
       "disconnectFailed": "Échec de la déconnexion WhatsApp.",
       "saveProfile": "Échec de la mise à jour du profil.",
       "changePassword": "Échec du changement de mot de passe.",
-      "deleteAccount": "Échec de la suppression du compte."
+      "deleteAccount": "Échec de la suppression du compte.",
+      "loadIntegrations": "Échec du chargement des intégrations.",
+      "connectIntegration": "Échec de l'enregistrement de l'intégration.",
+      "disconnectIntegration": "Échec de la déconnexion de l'intégration."
     }
   },
   "Admin": {

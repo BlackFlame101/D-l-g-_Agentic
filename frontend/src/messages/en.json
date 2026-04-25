@@ -143,6 +143,7 @@
       "knowledge": "Knowledge Base",
       "whatsapp": "WhatsApp",
       "conversations": "Conversations",
+      "integrations": "Integrations",
       "billing": "Billing",
       "settings": "Settings"
     },
@@ -296,6 +297,22 @@
       "confirmDelete": "Delete My Account",
       "accountDeleted": "Account deleted."
     },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Connect external services that your AI agent can use.",
+      "storeUrl": "Shopify Store URL",
+      "accessToken": "Admin API Access Token",
+      "tokenHint": "Your token is encrypted at rest and always masked in the dashboard.",
+      "connect": "Connect Shopify",
+      "update": "Update credentials",
+      "disconnect": "Disconnect",
+      "connected": "Shopify integration saved.",
+      "disconnected": "Shopify integration disconnected.",
+      "notConnected": "Not connected",
+      "pending": "Pending activation",
+      "active": "Active",
+      "pendingHelp": "Your credentials are saved. An admin must enable this integration before the AI can use it."
+    },
     "errors": {
       "loadAgent": "Failed to load agent configuration.",
       "saveAgent": "Failed to save agent.",
@@ -305,7 +322,10 @@
       "disconnectFailed": "Failed to disconnect WhatsApp.",
       "saveProfile": "Failed to update profile.",
       "changePassword": "Failed to change password.",
-      "deleteAccount": "Failed to delete account."
+      "deleteAccount": "Failed to delete account.",
+      "loadIntegrations": "Failed to load integrations.",
+      "connectIntegration": "Failed to save integration.",
+      "disconnectIntegration": "Failed to disconnect integration."
     }
   },
   "Admin": {

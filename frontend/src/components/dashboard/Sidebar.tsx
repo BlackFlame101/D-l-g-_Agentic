@@ -15,6 +15,7 @@ import {
   CreditCard,
   Smartphone,
   BookOpen,
+  Plug,
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
@@ -37,6 +38,7 @@ const navItems = [
   { key: "knowledge", icon: BookOpen, href: "/dashboard/knowledge" },
   { key: "whatsapp", icon: Smartphone, href: "/dashboard/whatsapp" },
   { key: "conversations", icon: MessageSquare, href: "/dashboard/conversations" },
+  { key: "integrations", icon: Plug, href: "/dashboard/integrations" },
   { key: "billing", icon: CreditCard, href: "/dashboard/billing" },
   { key: "settings", icon: Settings, href: "/dashboard/settings" },
 ];

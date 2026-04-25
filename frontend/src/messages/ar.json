@@ -143,6 +143,7 @@
       "knowledge": "قاعدة المعرفة",
       "whatsapp": "واتساب",
       "conversations": "المحادثات",
+      "integrations": "التكاملات",
       "billing": "الفوترة",
       "settings": "الإعدادات"
     },
@@ -296,6 +297,22 @@
       "confirmDelete": "حذف حسابي",
       "accountDeleted": "تم حذف الحساب."
     },
+    "integrations": {
+      "title": "التكاملات",
+      "description": "اربط الخدمات الخارجية التي يمكن لوكيل الذكاء الاصطناعي استخدامها.",
+      "storeUrl": "رابط متجر Shopify",
+      "accessToken": "رمز Admin API",
+      "tokenHint": "يتم تشفير الرمز أثناء التخزين ويظهر دائماً بشكل مخفي في لوحة التحكم.",
+      "connect": "ربط Shopify",
+      "update": "تحديث بيانات الربط",
+      "disconnect": "إلغاء الربط",
+      "connected": "تم حفظ تكامل Shopify.",
+      "disconnected": "تم إلغاء تكامل Shopify.",
+      "notConnected": "غير متصل",
+      "pending": "بانتظار التفعيل",
+      "active": "نشط",
+      "pendingHelp": "تم حفظ بياناتك. يجب على المشرف تفعيل التكامل قبل أن يتمكن الذكاء الاصطناعي من استخدامه."
+    },
     "errors": {
       "loadAgent": "فشل تحميل تكوين الوكيل.",
       "saveAgent": "فشل حفظ الوكيل.",
@@ -305,7 +322,10 @@
       "disconnectFailed": "فشل فصل واتساب.",
       "saveProfile": "فشل تحديث الملف الشخصي.",
       "changePassword": "فشل تغيير كلمة المرور.",
-      "deleteAccount": "فشل حذف الحساب."
+      "deleteAccount": "فشل حذف الحساب.",
+      "loadIntegrations": "فشل تحميل التكاملات.",
+      "connectIntegration": "فشل حفظ التكامل.",
+      "disconnectIntegration": "فشل إلغاء التكامل."
     }
   },
   "Admin": {

@@ -26,6 +26,7 @@ from schemas.admin import (
     AdminUserUsageDay,
 )
 from services.supabase import get_admin_client
+from services.integrations import set_shopify_feature_enabled
 
 logger = get_logger(__name__)
 
@@ -494,3 +495,15 @@ async def get_stats(_admin: CurrentUser = Depends(require_admin)) -> AdminStatsO
         messages_last_30d=msgs_30,
         estimated_mrr_mad=round(mrr, 2),
     )
+
+
+@router.patch("/integrations/{user_id}/shopify/enable")
+async def toggle_shopify_feature(
+    user_id: UUID,
+    enabled: bool = Query(...),
+    _admin: CurrentUser = Depends(require_admin),
+) -> dict:
+    try:
+        return set_shopify_feature_enabled(str(user_id), enabled)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

@@ -13,7 +13,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from agno.agent import Agent, Message
 from agno.models.google import Gemini
@@ -89,6 +89,7 @@ class AgentReply:
 def _build_system_prompt(
     agent_row: dict,
     chunks: List[RetrievedChunk],
+    memory: Optional[dict] = None,
 ) -> str:
     """Compose a system prompt from the agent's config + retrieved knowledge."""
     parts: list[str] = []
@@ -144,14 +145,22 @@ def _build_system_prompt(
             "check with the team and offer to take a message - don't invent facts."
         )
 
+    if memory:
+        from services.memory import format_memory_for_prompt
+
+        memory_block = format_memory_for_prompt(memory)
+        if memory_block:
+            parts.append(memory_block)
+
     return "\n\n".join(parts)
 
 
-def _build_agent(system_prompt: str) -> Agent:
+def _build_agent(system_prompt: str, tools: Optional[list[Any]] = None) -> Agent:
     model = Gemini(id=settings.gemini_model, api_key=settings.google_api_key)
     return Agent(
         model=model,
         system_message=system_prompt,
+        tools=tools or [],
         markdown=False,
         telemetry=False,
     )
@@ -240,13 +249,15 @@ def generate_reply(
     chunks: List[RetrievedChunk],
     history: List[HistoryMessage],
     fallback_message: Optional[str] = None,
+    tools: Optional[list[Any]] = None,
+    memory: Optional[dict] = None,
 ) -> AgentReply:
     """Run the Agno agent and return a structured reply.
 
     If Agno raises or produces empty content, returns the configured
     ``fallback_message`` (or a generic fallback) with ``used_fallback=True``.
     """
-    system_prompt = _build_system_prompt(agent_row, chunks)
+    system_prompt = _build_system_prompt(agent_row, chunks, memory=memory)
     fallback = (
         fallback_message
         or agent_row.get("fallback_message")
@@ -268,7 +279,7 @@ def generate_reply(
             )
 
     result = None
-    agent = _build_agent(system_prompt)
+    agent = _build_agent(system_prompt, tools=tools)
     input_messages = _build_input_messages(history, user_message)
     for attempt in range(MAX_LLM_RETRIES):
         try:

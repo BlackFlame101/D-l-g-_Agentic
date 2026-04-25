@@ -30,9 +30,12 @@ from services.documents import (
     iter_batches,
 )
 from services.gemini import approximate_token_count, embed_documents
+from services.integrations import get_shopify_integration
+from services.memory import load_contact_memory, update_contact_memory
 from services.rag import retrieve_context
 from services.storage import download_file
 from services.supabase import get_admin_client
+from services.tools.agno_shopify import make_shopify_tools
 from services.usage import check_subscription_limit, increment_usage
 
 logger = get_logger(__name__)
@@ -166,11 +169,19 @@ def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, An
     if history and history[-1].role == "user" and history[-1].content == user_message_text:
         history = history[:-1]
 
+    tools = []
+    shopify_creds = get_shopify_integration(payload.user_id)
+    if shopify_creds:
+        tools = make_shopify_tools(**shopify_creds)
+
+    memory = load_contact_memory(conversation["id"])
     reply = generate_reply(
         agent_row=agent_row,
         user_message=user_message_text,
         chunks=chunks,
         history=history,
+        tools=tools,
+        memory=memory,
     )
 
     insert_message(
@@ -187,6 +198,7 @@ def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, An
     )
 
     increment_usage(payload.user_id, messages=1, tokens=reply.tokens_used)
+    update_contact_memory(conversation["id"], user_message_text, reply.content)
 
     try:
         send_whatsapp_reply(payload.user_id, payload.sender_jid, reply.content)

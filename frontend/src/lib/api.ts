@@ -190,6 +190,29 @@ export const conversationsApi = {
     }),
 };
 
+// -- Integrations --
+export interface ShopifyIntegration {
+  id?: string;
+  type: "shopify";
+  store_url: string;
+  token_saved: boolean;
+  is_active: boolean;
+  feature_enabled: boolean;
+  updated_at?: string | null;
+  connected: boolean;
+}
+
+export const integrationsApi = {
+  getShopify: () => request<ShopifyIntegration>("/api/integrations/shopify"),
+  connectShopify: (data: { store_url: string; access_token: string }) =>
+    request<ShopifyIntegration>("/api/integrations/shopify", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  disconnectShopify: () =>
+    request<void>("/api/integrations/shopify", { method: "DELETE" }),
+};
+
 // -- WhatsApp Bridge --
 export function getWhatsAppQrWsUrl(userId: string): string {
   // Append apiSecret as a query param so the browser WebSocket (which can't
