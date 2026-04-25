@@ -1,19 +1,22 @@
 """WhatsApp bridge webhook router."""
+
+from __future__ import annotations
+
 import base64
 import hashlib
 import hmac as hmac_lib
+import json
 import re
-from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from core.config import settings
-from services.bridge import send_whatsapp_reply
-
 from core.logging import get_logger
 from core.webhook_auth import verify_bridge_secret
 from schemas.webhook import WebhookAck, WhatsAppWebhookPayload
+from services.bridge import send_whatsapp_reply
 from services.conversations import (
     get_active_agent_for_user,
     has_message_with_whatsapp_id,
@@ -21,7 +24,6 @@ from services.conversations import (
 )
 
 logger = get_logger(__name__)
-
 router = APIRouter(prefix="/api/webhook", tags=["webhook"])
 
 
