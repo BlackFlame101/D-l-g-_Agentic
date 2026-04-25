@@ -86,14 +86,24 @@ async def disconnect_shopify(user: CurrentUser = Depends(get_current_user)) -> N
 @router.get("/shopify/oauth/start")
 async def shopify_oauth_start(
     shop: str = Query(..., description="e.g. mystore.myshopify.com"),
-    user: CurrentUser = Depends(get_current_user),
+    token: str = Query(..., description="Supabase access token"),
 ):
-    """
-    Generate a Shopify OAuth URL and redirect the merchant there.
-    The user is already logged in to Delege at this point.
-    """
     if not settings.shopify_client_id:
         raise HTTPException(status_code=500, detail="Shopify OAuth is not configured.")
+
+    # Verify the token manually (browser redirect can't send Authorization header)
+    try:
+        from services.supabase import get_user_client
+        user_client = get_user_client(token)
+        resp = user_client.auth.get_user(token)
+        user = getattr(resp, "user", None)
+        if not user or not getattr(user, "id", None):
+            raise HTTPException(status_code=401, detail="Invalid or expired token.")
+        user_id = str(user.id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.") from exc
 
     # Normalize shop domain
     shop = shop.strip().lower().replace("https://", "").replace("http://", "").strip("/")
@@ -102,7 +112,7 @@ async def shopify_oauth_start(
 
     # Store state in Redis: state_token -> user_id
     state = secrets.token_urlsafe(32)
-    _redis.setex(f"shopify_oauth_state:{state}", _OAUTH_STATE_TTL, user.id)
+    _get_redis().setex(f"shopify_oauth_state:{state}", _OAUTH_STATE_TTL, user_id)
 
     params = urllib.parse.urlencode({
         "client_id": settings.shopify_client_id,
@@ -110,9 +120,7 @@ async def shopify_oauth_start(
         "redirect_uri": settings.shopify_redirect_uri,
         "state": state,
     })
-    shopify_auth_url = f"https://{shop}/admin/oauth/authorize?{params}"
-    return RedirectResponse(url=shopify_auth_url)
-
+    return RedirectResponse(url=f"https://{shop}/admin/oauth/authorize?{params}")
 
 @router.get("/shopify/oauth/callback")
 async def shopify_oauth_callback(

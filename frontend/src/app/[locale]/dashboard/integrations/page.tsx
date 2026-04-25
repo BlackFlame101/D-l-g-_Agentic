@@ -48,14 +48,19 @@ export default function IntegrationsPage() {
     }
   }
 
-  function handleOAuthConnect() {
+  async function handleOAuthConnect() {
     if (!shopDomain.trim()) {
       toast.error("Enter your Shopify store domain first.");
       return;
     }
     setConnecting(true);
-    // Redirects browser to Shopify — no async needed
-    integrationsApi.startShopifyOAuth(shopDomain.trim());
+    try {
+      await integrationsApi.startShopifyOAuth(shopDomain.trim());
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start Shopify connection.");
+      setConnecting(false);
+    }
+    // Don't setConnecting(false) on success — page will redirect
   }
 
   async function handleDisconnect() {

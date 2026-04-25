@@ -213,9 +213,15 @@ export const integrationsApi = {
     request<void>("/api/integrations/shopify", { method: "DELETE" }),
 
   // OAuth one-click connect — redirects to Shopify, no return value
-  startShopifyOAuth: (shop: string): void => {
-    const params = new URLSearchParams({ shop });
-    // We redirect the browser directly — the backend handles the OAuth dance
+  startShopifyOAuth: async (shop: string): Promise<void> => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error("Not authenticated");
+    
+    const params = new URLSearchParams({ 
+      shop, 
+      token: session.access_token 
+    });
     window.location.href = `${API_URL}/api/integrations/shopify/oauth/start?${params}`;
   },
 };
