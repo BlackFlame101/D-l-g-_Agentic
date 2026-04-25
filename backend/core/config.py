@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
 
+    # Shopify OAuth
+    shopify_client_id: str = ""
+    shopify_client_secret: str = ""
+    shopify_app_scopes: str = "read_products,read_orders,read_customers"
+    shopify_redirect_uri: str = ""  # e.g. https://your-api.railway.app/api/integrations/shopify/oauth/callback
+    shopify_webhook_secret: str = ""  # from Shopify webhook settings
+    shopify_webhook_user_id: str = ""  # your Delege user_id that owns the WhatsApp session
+    frontend_app_url: str = "http://localhost:3000"
+
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 

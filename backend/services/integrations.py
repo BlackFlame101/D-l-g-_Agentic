@@ -145,3 +145,30 @@ def set_shopify_feature_enabled(user_id: str, enabled: bool) -> dict:
     if not resp.data:
         raise RuntimeError("Shopify integration not found for user.")
     return {"status": "updated", "feature_enabled": bool(enabled)}
+
+def get_shopify_integration_by_store(store: str) -> Optional[dict]:
+    """Find a Shopify integration by store domain (for webhook routing)."""
+    normalized = _normalize_store_url(store)
+    admin = get_admin_client()
+    resp = (
+        admin.table("integrations")
+        .select("user_id, config")
+        .eq("type", "shopify")
+        .eq("is_active", True)
+        .is_("deleted_at", "null")
+        .execute()
+    )
+    for row in resp.data or []:
+        config = row.get("config") or {}
+        if _normalize_store_url(config.get("store_url") or "") == normalized:
+            enc_token = (config.get("access_token_enc") or "").strip()
+            if enc_token:
+                try:
+                    return {
+                        "user_id": row["user_id"],
+                        "store_url": normalized,
+                        "access_token": decrypt(enc_token),
+                    }
+                except Exception:
+                    pass
+    return None

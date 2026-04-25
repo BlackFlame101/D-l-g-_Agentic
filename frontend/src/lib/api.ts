@@ -211,6 +211,13 @@ export const integrationsApi = {
     }),
   disconnectShopify: () =>
     request<void>("/api/integrations/shopify", { method: "DELETE" }),
+
+  // OAuth one-click connect — redirects to Shopify, no return value
+  startShopifyOAuth: (shop: string): void => {
+    const params = new URLSearchParams({ shop });
+    // We redirect the browser directly — the backend handles the OAuth dance
+    window.location.href = `${API_URL}/api/integrations/shopify/oauth/start?${params}`;
+  },
 };
 
 // -- WhatsApp Bridge --

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,21 +10,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { integrationsApi, type ShopifyIntegration } from "@/lib/api";
-import { Link2, Loader2, Plug, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-
-const TOKEN_MASK = "••••••••";
 
 export default function IntegrationsPage() {
   const t = useTranslations("Dashboard");
+  const searchParams = useSearchParams();
+
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [integration, setIntegration] = useState<ShopifyIntegration | null>(null);
-  const [storeUrl, setStoreUrl] = useState("");
-  const [accessToken, setAccessToken] = useState("");
+  const [shopDomain, setShopDomain] = useState("");
 
   useEffect(() => {
+    // Show success toast if redirected back from Shopify OAuth
+    if (searchParams.get("shopify") === "connected") {
+      toast.success(t("integrations.connected"));
+      // Clean up URL param without re-render loop
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     loadIntegration();
   }, []);
 
@@ -33,8 +39,7 @@ export default function IntegrationsPage() {
       const row = await integrationsApi.getShopify();
       setIntegration(row);
       if (row.connected) {
-        setStoreUrl(row.store_url || "");
-        setAccessToken("");
+        setShopDomain(row.store_url || "");
       }
     } catch (err: any) {
       toast.error(err.message || t("errors.loadIntegrations"));
@@ -43,26 +48,14 @@ export default function IntegrationsPage() {
     }
   }
 
-  async function handleSave() {
-    if (!storeUrl.trim() || !accessToken.trim()) {
-      toast.error(t("errors.connectIntegration"));
+  function handleOAuthConnect() {
+    if (!shopDomain.trim()) {
+      toast.error("Enter your Shopify store domain first.");
       return;
     }
-    setSaving(true);
-    try {
-      const saved = await integrationsApi.connectShopify({
-        store_url: storeUrl,
-        access_token: accessToken,
-      });
-      setIntegration(saved);
-      setStoreUrl(saved.store_url || storeUrl);
-      setAccessToken("");
-      toast.success(t("integrations.connected"));
-    } catch (err: any) {
-      toast.error(err.message || t("errors.connectIntegration"));
-    } finally {
-      setSaving(false);
-    }
+    setConnecting(true);
+    // Redirects browser to Shopify — no async needed
+    integrationsApi.startShopifyOAuth(shopDomain.trim());
   }
 
   async function handleDisconnect() {
@@ -77,8 +70,7 @@ export default function IntegrationsPage() {
         feature_enabled: false,
         connected: false,
       });
-      setStoreUrl("");
-      setAccessToken("");
+      setShopDomain("");
       toast.success(t("integrations.disconnected"));
     } catch (err: any) {
       toast.error(err.message || t("errors.disconnectIntegration"));
@@ -94,8 +86,7 @@ export default function IntegrationsPage() {
         <Card>
           <CardContent className="space-y-4 pt-6">
             <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-48" />
           </CardContent>
         </Card>
       </div>
@@ -128,44 +119,29 @@ export default function IntegrationsPage() {
             {pending && (
               <Badge className="bg-chart-4/20 text-chart-4">{t("integrations.pending")}</Badge>
             )}
-            {!connected && <Badge variant="outline">{t("integrations.notConnected")}</Badge>}
+            {!connected && (
+              <Badge variant="outline">{t("integrations.notConnected")}</Badge>
+            )}
           </CardTitle>
         </CardHeader>
+
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="shopifyStoreUrl">{t("integrations.storeUrl")}</Label>
-            <Input
-              id="shopifyStoreUrl"
-              value={storeUrl}
-              onChange={(e) => setStoreUrl(e.target.value)}
-              placeholder="mystore.myshopify.com"
-            />
-          </div>
+          {connected ? (
+            // ── Connected state ──────────────────────────────────────────
+            <div className="space-y-4">
+              <div className="rounded-md border border-border bg-muted/40 px-4 py-3">
+                <p className="text-sm font-medium text-foreground">{integration?.store_url}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {t("integrations.tokenHint")}
+                </p>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="shopifyAccessToken">{t("integrations.accessToken")}</Label>
-            <Input
-              id="shopifyAccessToken"
-              type="password"
-              value={connected && !accessToken ? TOKEN_MASK : accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              placeholder="shpat_..."
-            />
-            <p className="text-xs text-muted-foreground">{t("integrations.tokenHint")}</p>
-          </div>
+              {pending && (
+                <p className="rounded-md border border-chart-4/40 bg-chart-4/10 p-3 text-sm text-foreground">
+                  {t("integrations.pendingHelp")}
+                </p>
+              )}
 
-          {pending && (
-            <p className="rounded-md border border-chart-4/40 bg-chart-4/10 p-3 text-sm text-foreground">
-              {t("integrations.pendingHelp")}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={handleSave} disabled={saving} className="gap-2">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-              {connected ? t("integrations.update") : t("integrations.connect")}
-            </Button>
-            {connected && (
               <Button
                 variant="outline"
                 onClick={handleDisconnect}
@@ -179,8 +155,38 @@ export default function IntegrationsPage() {
                 )}
                 {t("integrations.disconnect")}
               </Button>
-            )}
-          </div>
+            </div>
+          ) : (
+            // ── Not connected state ──────────────────────────────────────
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="shopDomain">{t("integrations.storeUrl")}</Label>
+                <Input
+                  id="shopDomain"
+                  value={shopDomain}
+                  onChange={(e) => setShopDomain(e.target.value)}
+                  placeholder="mystore.myshopify.com"
+                  onKeyDown={(e) => e.key === "Enter" && handleOAuthConnect()}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Just your store domain — no API keys needed.
+                </p>
+              </div>
+
+              <Button
+                onClick={handleOAuthConnect}
+                disabled={connecting}
+                className="gap-2"
+              >
+                {connecting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4" />
+                )}
+                {t("integrations.connect")}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
