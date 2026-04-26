@@ -172,8 +172,10 @@ Example format:
         response = client.models.generate_content(
             model=settings.gemini_model,
             contents=prompt,
-            temperature=0.7,
-            max_output_tokens=1000,
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=1000,
+            ),
         )
         raw = (response.text or "").strip()
         raw = raw.replace("```json", "").replace("```", "").strip()
