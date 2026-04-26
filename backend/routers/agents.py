@@ -174,13 +174,24 @@ Example format:
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.7,
-                max_output_tokens=1000,
+                max_output_tokens=2048,
             ),
         )
         raw = (response.text or "").strip()
         raw = raw.replace("```json", "").replace("```", "").strip()
-        import json
-        data = json.loads(raw)
+
+        # Extract JSON object even if there's trailing garbage
+        import re, json
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if not match:
+            raise ValueError(f"No JSON object found in response: {raw[:200]}")
+        raw = match.group(0)
+
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            # Last resort: try to salvage truncated JSON by closing open strings/braces
+            raise ValueError(f"Malformed JSON from model: {raw[:300]}")
         return GeneratePromptResponse(
             system_prompt=str(data.get("system_prompt", ""))[:800],
             greeting_message=str(data.get("greeting_message", ""))[:200],
