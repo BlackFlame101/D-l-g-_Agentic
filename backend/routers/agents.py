@@ -172,7 +172,7 @@ Example format:
         response = client.models.generate_content(
             model=settings.gemini_model,
             contents=prompt,
-            config=types.GenerateContentConfig(
+            generation_config=types.GenerateContentConfig(
                 temperature=0.7,
                 max_output_tokens=1000,
             ),
@@ -187,5 +187,5 @@ Example format:
             fallback_message=str(data.get("fallback_message", ""))[:200],
         )
     except Exception as exc:
-        logger.error("Prompt generation failed", extra={"error": str(exc)})
-        raise HTTPException(status_code=500, detail="Failed to generate prompt.")
+        logger.error("Prompt generation failed", extra={"error": str(exc), "type": type(exc).__name__})
+        raise HTTPException(status_code=500, detail=f"Failed to generate prompt: {str(exc)}")
