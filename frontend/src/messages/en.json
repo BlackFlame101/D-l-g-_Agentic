@@ -193,7 +193,15 @@
       "saved": "Agent updated successfully!",
       "created": "Agent created successfully!",
       "saveChanges": "Save Changes",
-      "createAgent": "Create Agent"
+      "createAgent": "Create Agent",
+      "quickSetup": "Quick Setup",
+      "quickSetupDesc": "Pick a template or describe your agent and let AI generate the configuration.",
+      "templateLang": "Template language",
+      "generateTitle": "Generate with AI",
+      "generatePlaceholder": "Ex: I want an agent for a clothing store that speaks Darija and handles order questions...",
+      "generateBtn": "Generate",
+      "generating": "Generating...",
+      "generateLang": "Language for generation"
     },
     "knowledge": {
       "title": "Knowledge Base",

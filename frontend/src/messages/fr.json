@@ -193,7 +193,15 @@
       "saved": "Agent mis à jour avec succès !",
       "created": "Agent créé avec succès !",
       "saveChanges": "Enregistrer",
-      "createAgent": "Créer l'agent"
+      "createAgent": "Créer l'agent",
+      "quickSetup": "Configuration rapide",
+      "quickSetupDesc": "Choisissez un modèle ou décrivez votre agent et laissez l'IA générer la configuration.",
+      "templateLang": "Langue du modèle",
+      "generateTitle": "Générer avec l'IA",
+      "generatePlaceholder": "Ex: Je veux un agent pour une boutique de vêtements qui parle Darija et gère les questions de commandes...",
+      "generateBtn": "Générer",
+      "generating": "Génération...",
+      "generateLang": "Langue de génération"
     },
     "knowledge": {
       "title": "Base de connaissances",

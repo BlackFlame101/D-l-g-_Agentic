@@ -7,6 +7,7 @@ from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 
 from core.logging import get_logger
 from core.security import CurrentUser, get_current_user
@@ -120,3 +121,71 @@ async def delete_agent(
     admin.table("agents").update(
         {"deleted_at": _now_iso(), "is_active": False}
     ).eq("id", str(agent_id)).eq("user_id", user.id).execute()
+
+
+class GeneratePromptRequest(BaseModel):
+    description: str = Field(min_length=10, max_length=1000)
+    language: str = Field(default="fr")  # "ar", "fr", "en"
+
+
+class GeneratePromptResponse(BaseModel):
+    system_prompt: str
+    greeting_message: str
+    fallback_message: str
+
+
+@router.post("/generate-prompt", response_model=GeneratePromptResponse)
+async def generate_agent_prompt(
+    body: GeneratePromptRequest,
+    user: CurrentUser = Depends(get_current_user),
+) -> GeneratePromptResponse:
+    """Use Gemini to generate system prompt + greeting + fallback from a description."""
+    from google import genai
+    from google.genai import types
+    from core.config import settings
+
+    lang_instruction = {
+        "ar": "Write all three fields in Moroccan Darija (Arabic script).",
+        "fr": "Write all three fields in French.",
+        "en": "Write all three fields in English.",
+        "darija": "Write all three fields in Moroccan Darija (Arabic script).",
+    }.get(body.language, "Write all three fields in French.")
+
+    prompt = f"""You are an expert at configuring WhatsApp AI agents for Moroccan businesses.
+
+A business owner described what they want their agent to do:
+"{body.description}"
+
+{lang_instruction}
+
+Generate a JSON object with exactly these three keys:
+- system_prompt: A detailed system prompt for the AI agent (max 800 characters). Include personality, behavior rules, and what the agent should/should not do.
+- greeting_message: A warm greeting the agent sends to new customers (max 200 characters).
+- fallback_message: A message when the agent doesn't understand (max 200 characters).
+
+Respond with ONLY valid JSON, no markdown, no explanation.
+Example format:
+{{"system_prompt": "...", "greeting_message": "...", "fallback_message": "..."}}"""
+
+    try:
+        client = genai.Client(api_key=settings.google_api_key)
+        response = client.models.generate_content(
+            model=settings.gemini_model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=1000,
+            ),
+        )
+        raw = (response.text or "").strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        import json
+        data = json.loads(raw)
+        return GeneratePromptResponse(
+            system_prompt=str(data.get("system_prompt", ""))[:800],
+            greeting_message=str(data.get("greeting_message", ""))[:200],
+            fallback_message=str(data.get("fallback_message", ""))[:200],
+        )
+    except Exception as exc:
+        logger.error("Prompt generation failed", extra={"error": str(exc)})
+        raise HTTPException(status_code=500, detail="Failed to generate prompt.")

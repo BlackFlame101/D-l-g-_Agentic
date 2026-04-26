@@ -103,6 +103,11 @@ export const agentsApi = {
     }),
   delete: (id: string) =>
     request<void>(`/api/agents/${id}`, { method: "DELETE" }),
+  generatePrompt: (data: { description: string; language: string }) =>
+    request<{ system_prompt: string; greeting_message: string; fallback_message: string }>(
+      "/api/agents/generate-prompt",
+      { method: "POST", body: JSON.stringify(data) }
+    ),
 };
 
 // -- Knowledge Base --

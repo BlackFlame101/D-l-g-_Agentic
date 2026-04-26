@@ -39,26 +39,27 @@ def _message_is_order_related(message: str) -> bool:
 
 
 def _normalize_phone_for_shopify(phone: str) -> list[str]:
-    """
-    Return candidate phone formats Shopify might have stored.
-    Shopify stores phones inconsistently — try multiple formats.
-    """
     digits = re.sub(r"\D", "", phone or "")
     candidates = []
 
-    # e.g. 2126XXXXXXXX → try +2126XXXXXXXX, 06XXXXXXXX
     if digits.startswith("212") and len(digits) == 12:
-        candidates.append(f"+{digits}")
-        candidates.append(f"0{digits[3:]}")
-    # e.g. 06XXXXXXXX → try +2126XXXXXXXX, 06XXXXXXXX
+        local = digits[3:]  # 680196588
+        candidates.append(f"+212{local}")      # +212680196588 ← Shopify format
+        candidates.append(f"0{local}")          # 0680196588
+        candidates.append(digits)               # 212680196588
+        candidates.append(f"+{digits}")         # +212680196588 (duplicate safety)
     elif digits.startswith("0") and len(digits) == 10:
-        candidates.append(f"+212{digits[1:]}")
-        candidates.append(digits)
+        local = digits[1:]  # 680196588
+        candidates.append(f"+212{local}")       # +212680196588 ← Shopify format
+        candidates.append(digits)               # 0680196588
+        candidates.append(f"212{local}")        # 212680196588
     else:
         candidates.append(f"+{digits}")
         candidates.append(digits)
 
-    return candidates
+    # Deduplicate while preserving order
+    seen = set()
+    return [c for c in candidates if not (c in seen or seen.add(c))]
 
 
 def _format_order(order: dict) -> str:
@@ -105,7 +106,6 @@ def _search_customer_by_phone(
     access_token: str,
     phone: str,
 ) -> Optional[dict]:
-    """Search Shopify for a customer by phone number, trying multiple formats."""
     headers = {
         "X-Shopify-Access-Token": access_token,
         "Content-Type": "application/json",
@@ -115,6 +115,8 @@ def _search_customer_by_phone(
     with httpx.Client(timeout=10.0) as client:
         for candidate in candidates:
             try:
+                # Shopify search works better without + in the query string
+                # Try both with and without URL encoding the +
                 resp = client.get(
                     f"https://{store_url}/admin/api/2026-04/customers/search.json",
                     params={"query": f"phone:{candidate}", "limit": 1},
@@ -123,12 +125,51 @@ def _search_customer_by_phone(
                 if resp.status_code == 200:
                     customers = resp.json().get("customers") or []
                     if customers:
+                        logger.info(
+                            "Shopify customer found by phone",
+                            extra={"candidate": candidate},
+                        )
                         return customers[0]
+                else:
+                    logger.warning(
+                        "Shopify phone search non-200",
+                        extra={"candidate": candidate, "status": resp.status_code},
+                    )
             except Exception as exc:
                 logger.warning(
                     "Shopify phone search failed",
                     extra={"candidate": candidate, "error": str(exc)},
                 )
+
+        # Last resort — fetch all customers and match manually
+        # Shopify search can be flaky with international numbers
+        try:
+            local_digits = re.sub(r"\D", "", phone)
+            if local_digits.startswith("212"):
+                local_digits = local_digits[3:]  # 680196588
+            elif local_digits.startswith("0"):
+                local_digits = local_digits[1:]  # 680196588
+
+            resp = client.get(
+                f"https://{store_url}/admin/api/2026-04/customers.json",
+                params={"limit": 250},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                for customer in resp.json().get("customers") or []:
+                    stored = re.sub(r"\D", "", customer.get("phone") or "")
+                    if stored.endswith(local_digits):
+                        logger.info(
+                            "Shopify customer found by suffix match",
+                            extra={"local_digits": local_digits},
+                        )
+                        return customer
+        except Exception as exc:
+            logger.warning(
+                "Shopify suffix match fallback failed",
+                extra={"error": str(exc)},
+            )
+
     return None
 
 
