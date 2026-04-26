@@ -35,6 +35,7 @@ from services.memory import load_contact_memory, update_contact_memory
 from services.rag import retrieve_context
 from services.storage import download_file
 from services.supabase import get_admin_client
+from services.shopify_customer import build_shopify_context
 from services.tools.agno_shopify import make_shopify_tools
 from services.usage import check_subscription_limit, increment_usage
 
@@ -170,9 +171,22 @@ def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, An
         history = history[:-1]
 
     tools = []
+    shopify_context: str | None = None
     shopify_creds = get_shopify_integration(payload.user_id)
     if shopify_creds:
         tools = make_shopify_tools(**shopify_creds)
+        # Look up this customer in Shopify and inject their order history
+        shopify_context = build_shopify_context(
+            store_url=shopify_creds["store_url"],
+            access_token=shopify_creds["access_token"],
+            sender_phone=payload.sender_phone,
+            user_message=user_message_text,
+        )
+        if shopify_context:
+            logger.info(
+                "Shopify context injected",
+                extra={"user_id": payload.user_id, "conversation_id": conversation["id"]},
+            )
 
     memory = load_contact_memory(conversation["id"])
     reply = generate_reply(
@@ -182,6 +196,7 @@ def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, An
         history=history,
         tools=tools,
         memory=memory,
+        shopify_context=shopify_context,
     )
 
     insert_message(

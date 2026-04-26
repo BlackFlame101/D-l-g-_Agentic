@@ -251,6 +251,7 @@ def generate_reply(
     fallback_message: Optional[str] = None,
     tools: Optional[list[Any]] = None,
     memory: Optional[dict] = None,
+    shopify_context: Optional[str] = None,
 ) -> AgentReply:
     """Run the Agno agent and return a structured reply.
 
@@ -258,6 +259,10 @@ def generate_reply(
     ``fallback_message`` (or a generic fallback) with ``used_fallback=True``.
     """
     system_prompt = _build_system_prompt(agent_row, chunks, memory=memory)
+    
+    # Inject Shopify context right before the agent replies
+    if shopify_context:
+        system_prompt = f"{system_prompt}\n\n{shopify_context}"
     fallback = (
         fallback_message
         or agent_row.get("fallback_message")

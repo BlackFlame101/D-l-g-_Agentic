@@ -9,6 +9,7 @@ import json
 import re
 
 import httpx
+import redis as redis_lib
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -25,6 +26,11 @@ from services.conversations import (
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/webhook", tags=["webhook"])
+
+
+def _get_redis():
+    """Get Redis client for deduplication state."""
+    return redis_lib.from_url(settings.redis_url, decode_responses=True)
 
 
 class WhatsAppTakeoverPayload(BaseModel):
@@ -184,38 +190,96 @@ def _build_order_message(order: dict) -> str:
     return msg
 
 
-@router.post("/shopify/orders/create", status_code=status.HTTP_200_OK)
-async def shopify_order_created(request: Request):
+def _build_draft_order_message(order: dict) -> str:
+    """Build a Darija WhatsApp message for a new draft order (pending payment)."""
+    order_name = order.get("name", "")
+    total = order.get("total_price", "0.00")
+    currency = order.get("currency", "MAD")
+    customer = order.get("customer") or {}
+    first_name = (
+        customer.get("first_name")
+        or (order.get("shipping_address") or {}).get("first_name", "")
+    )
+
+    items = order.get("line_items") or []
+    product_lines = []
+    for item in items[:5]:
+        qty = item.get("quantity", 1)
+        title = item.get("title", "")
+        product_lines.append(f"  • {qty}x {title}")
+    products_text = "\n".join(product_lines) if product_lines else ""
+
+    greeting = f"Salam {first_name}! 👋" if first_name else "Salam! 👋"
+
+    msg = (
+        f"{greeting}\n\n"
+        f"📋 Tlab dyalk *{order_name}* twasalna!\n\n"
+    )
+    if products_text:
+        msg += f"🛍️ *Mshtariat:*\n{products_text}\n\n"
+    msg += (
+        f"💰 *Total:* {total} {currency}\n\n"
+        f"⏳ Ghadi nconfirmiwlek l'commande men ba3d ma nkamlo l-payment. "
+        f"Ila 3ndek chi so2al, kteb lina hna. 🙏"
+    )
+    return msg
+
+
+def _build_payment_confirmed_message(order: dict) -> str:
+    """Build a Darija WhatsApp message when draft order is converted to paid order."""
+    order_name = order.get("name", "")
+    total = order.get("total_price", "0.00")
+    currency = order.get("currency", "MAD")
+    customer = order.get("customer") or {}
+    first_name = (
+        customer.get("first_name")
+        or (order.get("shipping_address") or {}).get("first_name", "")
+    )
+
+    greeting = f"Salam {first_name}! 👋" if first_name else "Salam! 👋"
+
+    return (
+        f"{greeting}\n\n"
+        f"✅ *L-payment dyal commande {order_name} twassal!*\n\n"
+        f"💰 *Total:* {total} {currency}\n\n"
+        f"🚀 Commande dyalk kaytjihez daba. "
+        f"Ghadi nessiftiwlak chi update men ba3d. Shokran! 🙏"
+    )
+
+
+@router.post("/shopify/drafts/create", status_code=status.HTTP_200_OK)
+async def shopify_draft_order_created(request: Request):
+    """
+    Receives Shopify 'draft_orders/create' webhook.
+    Fires immediately when customer submits a custom checkout form.
+    Sends instant 'we received your order' WhatsApp confirmation.
+    """
     body = await request.body()
 
     hmac_header = request.headers.get("X-Shopify-Hmac-Sha256", "")
     if not _verify_shopify_webhook(body, hmac_header):
-        logger.warning("Shopify webhook HMAC verification failed")
+        logger.warning("Shopify draft order webhook HMAC verification failed")
         raise HTTPException(status_code=401, detail="Invalid webhook signature.")
 
     try:
-        import json
         order = json.loads(body)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body.")
 
     order_name = order.get("name", "unknown")
-
-    # ── Find which user owns this Shopify store ──────────────────────────
-    from services.integrations import get_shopify_integration_by_store
     shop_domain = request.headers.get("X-Shopify-Shop-Domain", "")
-    integration = get_shopify_integration_by_store(shop_domain) if shop_domain else None
 
+    from services.integrations import get_shopify_integration_by_store
+    integration = get_shopify_integration_by_store(shop_domain) if shop_domain else None
     if not integration:
         logger.warning(
-            "No Delege user found for Shopify store — skipping WhatsApp",
+            "No Delege user found for Shopify store — skipping draft order WhatsApp",
             extra={"shop": shop_domain, "order": order_name},
         )
         return {"status": "skipped", "reason": "no_matching_user"}
 
     user_id = integration["user_id"]
 
-    # ── Extract and normalize phone ──────────────────────────────────────
     raw_phone = (
         (order.get("shipping_address") or {}).get("phone")
         or (order.get("billing_address") or {}).get("phone")
@@ -226,24 +290,118 @@ async def shopify_order_created(request: Request):
     phone = _normalize_moroccan_phone(raw_phone)
     if not phone:
         logger.info(
-            "Shopify order has no usable phone number, skipping",
+            "Draft order has no usable phone number, skipping",
             extra={"order": order_name, "shop": shop_domain},
         )
         return {"status": "skipped", "reason": "no_phone"}
 
-    # ── Send WhatsApp confirmation ────────────────────────────────────────
-    message = _build_order_message(order)
+    # Store draft order ID in Redis so the real order handler
+    # knows this customer already got a confirmation and sends
+    # a payment confirmation instead of a duplicate receipt
+    draft_id = str(order.get("id", ""))
+    if draft_id:
+        _get_redis().setex(
+            f"shopify_draft_notified:{draft_id}",
+            60 * 60 * 48,  # 48 hours — enough time for owner to convert
+            phone,
+        )
+
+    message = _build_draft_order_message(order)
     try:
         await send_whatsapp_reply(user_id=user_id, to=phone, message=message)
         logger.info(
-            "Shopify order confirmation sent",
+            "Draft order confirmation sent",
             extra={"order": order_name, "phone": phone[:6] + "****"},
         )
     except Exception as exc:
         logger.error(
-            "Failed to send Shopify WhatsApp confirmation",
+            "Failed to send draft order WhatsApp confirmation",
             extra={"order": order_name, "error": str(exc)},
         )
         return {"status": "error", "reason": "whatsapp_send_failed"}
 
     return {"status": "sent", "order": order_name}
+
+
+@router.post("/shopify/orders/create", status_code=status.HTTP_200_OK)
+async def shopify_order_created(request: Request):
+    """
+    Receives Shopify 'orders/create' webhook.
+    - If order came from a draft order → sends payment confirmed message
+    - If fresh order (standard checkout) → sends full order confirmation
+    """
+    body = await request.body()
+
+    hmac_header = request.headers.get("X-Shopify-Hmac-Sha256", "")
+    if not _verify_shopify_webhook(body, hmac_header):
+        logger.warning("Shopify webhook HMAC verification failed")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature.")
+
+    try:
+        order = json.loads(body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body.")
+
+    order_name = order.get("name", "unknown")
+    shop_domain = request.headers.get("X-Shopify-Shop-Domain", "")
+
+    from services.integrations import get_shopify_integration_by_store
+    integration = get_shopify_integration_by_store(shop_domain) if shop_domain else None
+    if not integration:
+        logger.warning(
+            "No Delege user found for Shopify store — skipping WhatsApp",
+            extra={"shop": shop_domain, "order": order_name},
+        )
+        return {"status": "skipped", "reason": "no_matching_user"}
+
+    user_id = integration["user_id"]
+
+    raw_phone = (
+        (order.get("shipping_address") or {}).get("phone")
+        or (order.get("billing_address") or {}).get("phone")
+        or (order.get("customer") or {}).get("phone")
+        or order.get("phone")
+        or ""
+    )
+    phone = _normalize_moroccan_phone(raw_phone)
+    if not phone:
+        logger.info(
+            "Order has no usable phone number, skipping",
+            extra={"order": order_name, "shop": shop_domain},
+        )
+        return {"status": "skipped", "reason": "no_phone"}
+
+    # Check if this order was converted from a draft we already notified
+    source_draft_id = str(order.get("draft_order_id") or "")
+    came_from_draft = False
+    if source_draft_id:
+        draft_key = f"shopify_draft_notified:{source_draft_id}"
+        came_from_draft = bool(_get_redis().get(draft_key))
+        if came_from_draft:
+            # Clean up — no longer needed
+            _get_redis().delete(draft_key)
+
+    if came_from_draft:
+        # Customer already got the "we received your order" message
+        # Now send the payment confirmation
+        message = _build_payment_confirmed_message(order)
+        msg_type = "payment_confirmation"
+    else:
+        # Fresh order from standard checkout — send full confirmation
+        message = _build_order_message(order)
+        msg_type = "order_confirmation"
+
+    try:
+        await send_whatsapp_reply(user_id=user_id, to=phone, message=message)
+        logger.info(
+            f"Shopify {msg_type} sent",
+            extra={"order": order_name, "phone": phone[:6] + "****"},
+        )
+    except Exception as exc:
+        logger.error(
+            f"Failed to send Shopify {msg_type}",
+            extra={"order": order_name, "error": str(exc)},
+        )
+        return {"status": "error", "reason": "whatsapp_send_failed"}
+
+    return {"status": "sent", "type": msg_type, "order": order_name}
