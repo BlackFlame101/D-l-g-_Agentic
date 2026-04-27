@@ -1,5 +1,4 @@
 """Shopify REST helpers used by Agno tools."""
-
 from __future__ import annotations
 
 import re
@@ -25,17 +24,41 @@ def _base_url(store_url: str) -> str:
 
 async def search_products(store_url: str, access_token: str, query: str) -> dict[str, Any]:
     """Search products by title keyword and return a compact summary payload."""
+    cleaned = (query or "").strip().lower()
+
+    # Vague/browse-intent queries — fetch all active products instead of title-matching
+    BROWSE_TRIGGERS = {"products", "product", "items", "catalogue", "catalog", "what do you have",
+                       "available", "shop", "all", "everything", "show me", "list"}
+    is_browse = not cleaned or cleaned in BROWSE_TRIGGERS or len(cleaned) <= 3
+
     url = f"{_base_url(store_url)}/products.json"
-    params = {
-        "title": (query or "").strip(),
-        "limit": 5,
-        "fields": "id,title,status,variants,images",
-    }
+
+    if is_browse:
+        # Return full catalogue (up to 20 active products)
+        params = {
+            "limit": 20,
+            "status": "active",
+            "fields": "id,title,status,variants,images",
+        }
+    else:
+        # Keyword search — but Shopify's ?title= is a STARTS-WITH filter, not full-text.
+        # We fetch more and filter client-side so "snowboard" matches "The Multi-managed Snowboard".
+        params = {
+            "limit": 25,
+            "status": "active",
+            "fields": "id,title,status,variants,images",
+        }
+
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(url, headers=_headers(access_token), params=params)
-        resp.raise_for_status()
+        resp.raise_for_status()  # <-- FIXED: inside the `async with` block
 
     products = resp.json().get("products", [])
+
+    # Client-side keyword filter for non-browse queries
+    if not is_browse:
+        products = [p for p in products if cleaned in (p.get("title") or "").lower()]
+
     results: list[dict[str, Any]] = []
     for product in products:
         if product.get("status") != "active":
@@ -49,6 +72,7 @@ async def search_products(store_url: str, access_token: str, query: str) -> dict
                 "in_stock": int(variant.get("inventory_quantity") or 0) > 0,
             }
         )
+
     return {"products": results, "count": len(results)}
 
 
@@ -58,7 +82,11 @@ def _format_order(order: dict[str, Any]) -> dict[str, Any]:
         "order_number": order.get("name"),
         "payment_status": order.get("financial_status"),
         "fulfillment_status": order.get("fulfillment_status") or "pending",
-        "items": [item.get("title", "") for item in (order.get("line_items") or []) if item.get("title")],
+        "items": [
+            item.get("title", "")
+            for item in (order.get("line_items") or [])
+            if item.get("title")
+        ],
         "created_at": order.get("created_at"),
     }
 
