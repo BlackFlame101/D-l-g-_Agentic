@@ -118,7 +118,7 @@ def _search_customer_by_phone(
                 # Shopify search works better without + in the query string
                 # Try both with and without URL encoding the +
                 resp = client.get(
-                    f"https://{store_url}/admin/api/2024-01/customers/search.json",
+                    f"https://{store_url}/admin/api/2025-01/customers/search.json",
                     params={"query": f"phone:{candidate}", "limit": 1},
                     headers=headers,
                 )
@@ -151,7 +151,7 @@ def _search_customer_by_phone(
                 local_digits = local_digits[1:]  # 680196588
 
             resp = client.get(
-                f"https://{store_url}/admin/api/2024-01/customers.json",
+                f"https://{store_url}/admin/api/2025-01/customers.json",
                 params={"limit": 250},
                 headers=headers,
             )
@@ -186,7 +186,7 @@ def _search_customer_by_email(
     with httpx.Client(timeout=10.0) as client:
         try:
             resp = client.get(
-                f"https://{store_url}/admin/api/2024-01/customers/search.json",
+                f"https://{store_url}/admin/api/2025-01/customers/search.json",
                 params={"query": f"email:{email}", "limit": 1},
                 headers=headers,
             )
@@ -215,7 +215,7 @@ def _get_customer_orders(
     with httpx.Client(timeout=10.0) as client:
         try:
             resp = client.get(
-                f"https://{store_url}/admin/api/2024-01/orders.json",
+                f"https://{store_url}/admin/api/2025-01/orders.json",
                 params={
                     "customer_id": customer_id,
                     "limit": 3,
