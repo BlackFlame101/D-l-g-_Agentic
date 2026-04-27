@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-SHOPIFY_API_VERSION = "2026-04"
+SHOPIFY_API_VERSION = "2024-01"
 
 
 def _headers(token: str) -> dict[str, str]:
