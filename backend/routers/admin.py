@@ -26,7 +26,7 @@ from schemas.admin import (
     AdminUserUsageDay,
 )
 from services.supabase import get_admin_client
-from services.integrations import set_shopify_feature_enabled
+from services.integrations import set_shopify_feature_enabled, get_integration_display
 
 logger = get_logger(__name__)
 
@@ -495,6 +495,18 @@ async def get_stats(_admin: CurrentUser = Depends(require_admin)) -> AdminStatsO
         messages_last_30d=msgs_30,
         estimated_mrr_mad=round(mrr, 2),
     )
+
+
+@router.get("/integrations/{user_id}/shopify")
+async def get_user_shopify_integration(
+    user_id: UUID,
+    _admin: CurrentUser = Depends(require_admin),
+) -> dict:
+    """Get Shopify integration status for a user."""
+    integration = get_integration_display(str(user_id))
+    if not integration:
+        return {"connected": False, "feature_enabled": False}
+    return {**integration, "connected": True}
 
 
 @router.patch("/integrations/{user_id}/shopify/enable")

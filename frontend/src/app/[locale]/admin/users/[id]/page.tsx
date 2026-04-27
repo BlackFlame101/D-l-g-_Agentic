@@ -13,7 +13,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CreditCard, MessageSquare, XCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, CreditCard, MessageSquare, XCircle, Store } from "lucide-react";
 import { toast } from "sonner";
 import { ActivatePlanDialog } from "../../_components/ActivatePlanDialog";
 
@@ -30,6 +31,12 @@ export default function AdminUserDetailPage({
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [shopifyIntegration, setShopifyIntegration] = useState<{
+    connected: boolean;
+    feature_enabled: boolean;
+    store_url?: string;
+  } | null>(null);
+  const [togglingShopify, setTogglingShopify] = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -43,8 +50,32 @@ export default function AdminUserDetailPage({
     }
   }
 
+  async function loadShopifyIntegration() {
+    try {
+      const data = await adminApi.getUserShopifyIntegration(id);
+      setShopifyIntegration(data);
+    } catch (err) {
+      // Don't show error if integration doesn't exist
+      setShopifyIntegration({ connected: false, feature_enabled: false });
+    }
+  }
+
+  async function toggleShopify(enabled: boolean) {
+    setTogglingShopify(true);
+    try {
+      await adminApi.toggleShopifyFeature(id, enabled);
+      await loadShopifyIntegration();
+      toast.success(enabled ? "Shopify enabled" : "Shopify disabled");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to toggle Shopify");
+    } finally {
+      setTogglingShopify(false);
+    }
+  }
+
   useEffect(() => {
     reload();
+    loadShopifyIntegration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -158,6 +189,46 @@ export default function AdminUserDetailPage({
             <p className="text-sm text-muted-foreground">{t("user.noUsage")}</p>
           ) : (
             <UsageBars usage={user.usage} />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Store className="h-4 w-4" /> Shopify Integration
+          </CardTitle>
+          {shopifyIntegration?.connected && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {shopifyIntegration.feature_enabled ? "Enabled" : "Disabled"}
+              </span>
+              <Switch
+                checked={shopifyIntegration.feature_enabled}
+                onCheckedChange={toggleShopify}
+                disabled={togglingShopify}
+              />
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          {!shopifyIntegration?.connected ? (
+            <p className="text-sm text-muted-foreground">
+              No Shopify integration connected for this user.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Store URL:</span>
+                <span className="text-sm font-medium">{shopifyIntegration.store_url || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <Badge variant={shopifyIntegration.feature_enabled ? "default" : "secondary"}>
+                  {shopifyIntegration.feature_enabled ? "Active" : "Disabled"}
+                </Badge>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

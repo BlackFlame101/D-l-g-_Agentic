@@ -149,4 +149,17 @@ export const adminApi = {
     authedFetch<void>(`/api/admin/subscriptions/${subId}`, {
       method: "DELETE",
     }),
+
+  toggleShopifyFeature: (userId: string, enabled: boolean) =>
+    authedFetch<{ status: string; feature_enabled: boolean }>(
+      `/api/admin/integrations/${userId}/shopify/enable?enabled=${enabled}`,
+      {
+        method: "PATCH",
+      }
+    ),
+
+  getUserShopifyIntegration: (userId: string) =>
+    authedFetch<{ connected: boolean; feature_enabled: boolean; store_url?: string }>(
+      `/api/admin/integrations/${userId}/shopify`
+    ),
 };
