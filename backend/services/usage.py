@@ -35,11 +35,54 @@ def _fetch_active_subscription(user_id: str) -> Optional[dict]:
     return resp.data[0] if resp.data else None
 
 
+TRIAL_PLAN_ID = "00000000-0000-0000-0000-000000000000"
+
+def _provision_free_trial(user_id: str) -> Optional[dict]:
+    """Automatically create a free trial subscription for a user."""
+    admin = get_admin_client()
+    try:
+        # Check if user already had a trial (don't give it twice)
+        existing = (
+            admin.table("subscriptions")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("plan_id", TRIAL_PLAN_ID)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            return None
+
+        # Create trial subscription
+        now = datetime.now(timezone.utc).isoformat()
+        insert_data = {
+            "user_id": user_id,
+            "plan_id": TRIAL_PLAN_ID,
+            "status": "active",
+            "message_limit": 50,
+            "current_usage": 0,
+            "activated_at": now,
+            "created_at": now,
+            "updated_at": now,
+        }
+        resp = admin.table("subscriptions").insert(insert_data).execute()
+        if resp.data:
+            logger.info("Free trial provisioned", extra={"user_id": user_id})
+            return resp.data[0]
+    except Exception as exc:
+        logger.error("Failed to provision free trial", extra={"error": str(exc), "user_id": user_id})
+    return None
+
+
 def check_subscription_limit(user_id: str) -> LimitCheck:
     """Decide whether ``user_id`` can send another message right now."""
     sub = _fetch_active_subscription(user_id)
+    
     if sub is None:
-        return LimitCheck(False, "no_subscription", None)
+        # Proactively provision free trial if no subscription exists
+        sub = _provision_free_trial(user_id)
+        if sub is None:
+            return LimitCheck(False, "no_subscription", None)
 
     if sub.get("status") != "active":
         return LimitCheck(False, "inactive", sub)

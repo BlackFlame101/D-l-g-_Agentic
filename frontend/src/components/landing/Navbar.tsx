@@ -8,7 +8,6 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
-// Shopify "S" logomark — shown inline next to the nav label
 function ShopifyIcon({ className }: { className?: string }) {
   return (
     <svg

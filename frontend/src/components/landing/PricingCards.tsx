@@ -53,7 +53,7 @@ export function PricingCards({
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-100px" }}
-      className="mt-14 grid gap-6 lg:grid-cols-3"
+      className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4"
     >
       {plans.map((plan, idx) => {
         const highlighted = idx === highlightIdx;

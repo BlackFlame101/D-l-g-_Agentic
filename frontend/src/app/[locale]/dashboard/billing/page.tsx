@@ -219,7 +219,9 @@ export default function BillingPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-heading text-lg font-bold text-foreground">
-                    {plan?.name || t("billing.standardPlan")}
+                    {plan?.name === "free_trial" 
+                      ? t("billing.freeTrial") 
+                      : (plan?.name || t("billing.standardPlan"))}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {plan
@@ -265,7 +267,9 @@ export default function BillingPage() {
                       onValueChange={(value) => setRequestedPlanId(value ?? "")}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select a plan">
+                          {requestedPlan?.display_name || requestedPlan?.name}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {availablePlans.map((p) => (
