@@ -209,10 +209,10 @@ export interface ShopifyIntegration {
 
 export const integrationsApi = {
   getShopify: () => request<ShopifyIntegration>("/api/integrations/shopify"),
-  connectShopify: (data: { store_url: string; access_token: string }) =>
+  connectShopify: (store_url: string, access_token: string) =>
     request<ShopifyIntegration>("/api/integrations/shopify", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({ store_url, access_token }),
     }),
   disconnectShopify: () =>
     request<void>("/api/integrations/shopify", { method: "DELETE" }),

@@ -109,6 +109,10 @@ def get_integration_display(user_id: str) -> Optional[dict]:
         .limit(1)
         .execute()
     )
+    logger.info(
+        "Integration display query result",
+        extra={"user_id": user_id, "count": len(resp.data or [])},
+    )
     if not resp.data:
         return None
 

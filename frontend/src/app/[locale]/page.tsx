@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
 import { HowItWorks } from "@/components/landing/HowItWorks";
+import { ShopifyIntegration } from "@/components/landing/ShopifyIntegration";
 import { Features } from "@/components/landing/Features";
 import { Pricing } from "@/components/landing/Pricing";
 import { FAQ } from "@/components/landing/FAQ";
@@ -16,11 +17,14 @@ export default function LandingPage() {
         <div className="bg-surface">
           <HowItWorks />
         </div>
-        <Features />
+        <ShopifyIntegration />
         <div className="bg-surface">
-          <Pricing />
+          <Features />
         </div>
-        <FAQ />
+        <Pricing />
+        <div className="bg-surface">
+          <FAQ />
+        </div>
       </main>
       <Footer />
       <WhatsAppButton />

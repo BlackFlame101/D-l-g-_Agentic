@@ -503,9 +503,13 @@ async def get_user_shopify_integration(
     _admin: CurrentUser = Depends(require_admin),
 ) -> dict:
     """Get Shopify integration status for a user."""
-    integration = get_integration_display(str(user_id))
+    user_id_str = str(user_id)
+    logger.info("Fetching Shopify integration for user", extra={"user_id": user_id_str})
+    integration = get_integration_display(user_id_str)
     if not integration:
+        logger.warning("Shopify integration not found for user", extra={"user_id": user_id_str})
         return {"connected": False, "feature_enabled": False}
+    logger.info("Shopify integration found", extra={"user_id": user_id_str, "store_url": integration.get("store_url")})
     return {**integration, "connected": True}
 
 
