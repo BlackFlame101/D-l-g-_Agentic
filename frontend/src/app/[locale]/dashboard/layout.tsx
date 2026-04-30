@@ -1,19 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Topbar } from "@/components/dashboard/Topbar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { useUser } from "@/hooks/use-user";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { user } = useUser();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Auto-provision free trial on dashboard load
+  useEffect(() => {
+    if (user) {
+      api.billing.getSubscription().catch(() => {
+        // Silently fail, it's a background provisioning
+      });
+    }
+  }, [user]);
 
   return (
     <TooltipProvider delay={0}>

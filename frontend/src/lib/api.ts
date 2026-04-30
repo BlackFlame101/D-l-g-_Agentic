@@ -260,3 +260,18 @@ export async function disconnectWhatsApp(userId: string): Promise<void> {
   );
   if (!res.ok) throw new Error("Failed to disconnect WhatsApp");
 }
+
+export const api = {
+  agents: agentsApi,
+  knowledge: knowledgeApi,
+  conversations: conversationsApi,
+  integrations: integrationsApi,
+  billing: {
+    getSubscription: () => request<any>("/api/admin/subscriptions/current"),
+  },
+  whatsapp: {
+    getStatus: getWhatsAppStatus,
+    disconnect: disconnectWhatsApp,
+    getQrUrl: getWhatsAppQrWsUrl,
+  },
+};

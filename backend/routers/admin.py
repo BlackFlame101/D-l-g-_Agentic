@@ -278,6 +278,30 @@ async def get_user_detail(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/subscriptions/current", response_model=Optional[AdminSubscriptionOut])
+async def get_current_subscription(
+    user: CurrentUser = Depends(get_current_user),
+) -> Optional[AdminSubscriptionOut]:
+    """Get the current active subscription for the authenticated user, or provision a trial."""
+    from services.usage import check_subscription_limit
+    # This call will automatically provision a trial if none exists
+    check_subscription_limit(user.id)
+    
+    admin = get_admin_client()
+    resp = (
+        admin.table("subscriptions")
+        .select("*")
+        .eq("user_id", user.id)
+        .is_("deleted_at", "null")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not resp.data:
+        return None
+    return _serialize_subscription(resp.data[0])
+
+
 @router.post(
     "/subscriptions",
     response_model=AdminSubscriptionOut,
