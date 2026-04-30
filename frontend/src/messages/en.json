@@ -310,19 +310,49 @@
     },
     "integrations": {
       "title": "Integrations",
-      "description": "Connect external services that your AI agent can use.",
-      "storeUrl": "Shopify Store URL",
-      "accessToken": "Admin API Access Token",
-      "tokenHint": "Your token is encrypted at rest and always masked in the dashboard.",
-      "connect": "Connect Shopify",
-      "update": "Update credentials",
-      "disconnect": "Disconnect",
-      "connected": "Shopify integration saved.",
-      "disconnected": "Shopify integration disconnected.",
-      "notConnected": "Not connected",
-      "pending": "Pending activation",
+      "description": "Connect your favorite tools to boost your agent's capabilities.",
       "active": "Active",
-      "pendingHelp": "Your credentials are saved. An admin must enable this integration before the AI can use it."
+      "pending": "Pending",
+      "notConnected": "Not Connected",
+      "connect": "Connect Store",
+      "disconnect": "Disconnect",
+      "storeUrl": "Shopify Store Domain",
+      "connected": "Shopify connected successfully!",
+      "disconnected": "Shopify disconnected.",
+      "tokenHint": "Your store is connected to our Shopify app.",
+      "pendingHelp": "Your integration is being reviewed and will be active shortly.",
+      "connectManual": "Connect with API token instead",
+      "manualTitle": "Connect using a custom app token",
+      "manualDesc": "Use this if the standard connect button doesn't work for your store.",
+      "manualStep1": "Go to your Shopify Admin → Settings → Apps and sales channels",
+      "manualStep2": "Click <strong className=\"text-foreground\">Develop apps</strong> → <strong className=\"text-foreground\">Create an app</strong>",
+      "manualStep3": "Give it any name, then click <strong className=\"text-foreground\">Configure Admin API scopes</strong>",
+      "manualStep4": "Enable: <code className=\"bg-muted px-1 rounded\">read_products</code>, <code className=\"bg-muted px-1 rounded\">read_orders</code>, <code className=\"bg-muted px-1 rounded\">read_customers</code>",
+      "manualStep5": "Click <strong className=\"text-foreground\">Save</strong> → then <strong className=\"text-foreground\">Install app</strong>",
+      "manualStep6": "Copy the <strong className=\"text-foreground\">Admin API access token</strong> and paste it below",
+      "accessToken": "Admin API Access Token",
+      "saveAndConnect": "Save & Connect",
+      "errorDomain": "Enter your Shopify store domain.",
+      "errorToken": "Enter your Admin API access token."
+    },
+    "shopify": {
+      "badge": "Shopify",
+      "titlePrefix": "Powerful",
+      "titleSuffix": "Integration",
+      "features": {
+        "orderTracking": {
+          "title": "Order Tracking",
+          "description": "Check order status in real-time to keep your customers always informed."
+        },
+        "orderConfirmation": {
+          "title": "Order Confirmation",
+          "description": "Automatically send a confirmation message to your customers after each purchase."
+        },
+        "productExpertise": {
+          "title": "Product Expertise",
+          "description": "The AI instantly answers questions about your products by drawing information directly from your Shopify catalog."
+        }
+      }
     },
     "errors": {
       "loadAgent": "Failed to load agent configuration.",

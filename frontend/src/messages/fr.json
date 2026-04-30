@@ -310,19 +310,49 @@
     },
     "integrations": {
       "title": "Intégrations",
-      "description": "Connectez des services externes que votre agent IA peut utiliser.",
-      "storeUrl": "URL de la boutique Shopify",
-      "accessToken": "Token d'accès Admin API",
-      "tokenHint": "Votre token est chiffré au repos et toujours masqué dans le dashboard.",
-      "connect": "Connecter Shopify",
-      "update": "Mettre à jour les identifiants",
-      "disconnect": "Déconnecter",
-      "connected": "Intégration Shopify enregistrée.",
-      "disconnected": "Intégration Shopify déconnectée.",
-      "notConnected": "Non connecté",
-      "pending": "En attente d'activation",
+      "description": "Connectez vos outils préférés pour booster les capacités de votre agent.",
       "active": "Actif",
-      "pendingHelp": "Vos identifiants sont enregistrés. Un admin doit activer l'intégration avant que l'IA puisse l'utiliser."
+      "pending": "En attente",
+      "notConnected": "Non connecté",
+      "connect": "Connecter la boutique",
+      "disconnect": "Déconnecter",
+      "storeUrl": "Domaine de la boutique Shopify",
+      "connected": "Shopify connecté avec succès !",
+      "disconnected": "Shopify déconnecté.",
+      "tokenHint": "Votre boutique est connectée à notre application Shopify.",
+      "pendingHelp": "Votre intégration est en cours de révision et sera active sous peu.",
+      "connectManual": "Connecter avec un token API à la place",
+      "manualTitle": "Connecter via un token d'application personnalisé",
+      "manualDesc": "Utilisez ceci si le bouton de connexion standard ne fonctionne pas pour votre boutique.",
+      "manualStep1": "Allez dans votre Admin Shopify → Paramètres → Applis et canaux de vente",
+      "manualStep2": "Cliquez sur <strong class=\"text-foreground\">Développer des applications</strong> → <strong class=\"text-foreground\">Créer une application</strong>",
+      "manualStep3": "Donnez-lui n'importe quel nom, puis cliquez sur <strong class=\"text-foreground\">Configurer les portées de l'API Admin</strong>",
+      "manualStep4": "Activez : <code class=\"bg-muted px-1 rounded\">read_products</code>, <code class=\"bg-muted px-1 rounded\">read_orders</code>, <code class=\"bg-muted px-1 rounded\">read_customers</code>",
+      "manualStep5": "Cliquez sur <strong class=\"text-foreground\">Enregistrer</strong> → puis <strong class=\"text-foreground\">Installer l'application</strong>",
+      "manualStep6": "Copiez le <strong class=\"text-foreground\">Token d'accès API Admin</strong> et collez-le ci-dessous",
+      "accessToken": "Token d'accès API Admin",
+      "saveAndConnect": "Enregistrer & Connecter",
+      "errorDomain": "Entrez le domaine de votre boutique Shopify.",
+      "errorToken": "Entrez votre token d'accès API Admin."
+    },
+    "shopify": {
+      "badge": "Shopify",
+      "titlePrefix": "Intégration",
+      "titleSuffix": "Puissante",
+      "features": {
+        "orderTracking": {
+          "title": "Suivi des Commandes",
+          "description": "Vérifiez le statut des commandes en temps réel pour tenir vos clients toujours informés."
+        },
+        "orderConfirmation": {
+          "title": "Confirmation de Commande",
+          "description": "Envoyez automatiquement un message de confirmation à vos clients après chaque achat."
+        },
+        "productExpertise": {
+          "title": "Expertise Produit",
+          "description": "L'IA répond instantanément aux questions sur vos produits en piochant les informations directement dans votre catalogue Shopify."
+        }
+      }
     },
     "errors": {
       "loadAgent": "Échec du chargement de la configuration de l'agent.",

@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/lib/motion";
 import { Package, CheckCircle, ShoppingBag } from "lucide-react";
 
+import { useTranslations } from "next-intl";
+
 // Shopify "S" bag logomark as inline SVG
 function ShopifyIcon({ className }: { className?: string }) {
   return (
@@ -32,31 +34,11 @@ function ShopifyIcon({ className }: { className?: string }) {
   );
 }
 
-const features = [
-  {
-    key: "orderTracking",
-    icon: Package,
-    title: "Suivi des Commandes",
-    description:
-      "Vérifiez le statut des commandes en temps réel pour tenir vos clients toujours informés.",
-  },
-  {
-    key: "orderConfirmation",
-    icon: CheckCircle,
-    title: "Confirmation de Commande",
-    description:
-      "Envoyez automatiquement un message de confirmation à vos clients après chaque achat.",
-  },
-  {
-    key: "productExpertise",
-    icon: ShoppingBag,
-    title: "Expertise Produit",
-    description:
-      "L'IA répond instantanément aux questions sur vos produits en piochant les informations directement dans votre catalogue Shopify.",
-  },
-] as const;
+const featureKeys = ["orderTracking", "orderConfirmation", "productExpertise"] as const;
 
 export function ShopifyIntegration() {
+  const t = useTranslations("Dashboard.shopify");
+  
   return (
     <section id="shopify" className="py-20 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -76,7 +58,7 @@ export function ShopifyIntegration() {
           >
             <ShopifyIcon className="h-4 w-4" />
             <span className="text-xs font-semibold uppercase tracking-widest text-[#95BF47]">
-              Shopify
+              {t("badge")}
             </span>
           </motion.div>
 
@@ -86,9 +68,9 @@ export function ShopifyIntegration() {
             transition={{ duration: 0.5 }}
             className="font-heading text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl"
           >
-            Intégration{" "}
+            {t("titlePrefix")}{" "}
             <span className="text-[#95BF47]">Shopify</span>{" "}
-            Puissante
+            {t("titleSuffix")}
           </motion.h2>
 
           {/* Accent bar — uses --primary (gold) so it blends with the palette */}
@@ -107,11 +89,11 @@ export function ShopifyIntegration() {
           viewport={{ once: true, margin: "-80px" }}
           className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {features.map((feat) => {
-            const Icon = feat.icon;
+          {featureKeys.map((key) => {
+            const Icon = key === "orderTracking" ? Package : key === "orderConfirmation" ? CheckCircle : ShoppingBag;
             return (
               <motion.div
-                key={feat.key}
+                key={key}
                 variants={fadeUp}
                 transition={{ duration: 0.5 }}
                 className="group rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-[#95BF47]/40 hover:shadow-lg hover:shadow-[#95BF47]/5"
@@ -122,10 +104,10 @@ export function ShopifyIntegration() {
                 </div>
 
                 <h3 className="mt-5 text-base font-semibold text-foreground">
-                  {feat.title}
+                  {t(`features.${key}.title`)}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {feat.description}
+                  {t(`features.${key}.description`)}
                 </p>
               </motion.div>
             );

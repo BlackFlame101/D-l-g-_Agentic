@@ -51,36 +51,36 @@ export default function IntegrationsPage() {
 
   async function handleOAuthConnect() {
     if (!shopDomain.trim()) {
-      toast.error("Enter your Shopify store domain first.");
+      toast.error(t("integrations.errorDomain"));
       return;
     }
     setConnecting(true);
     try {
       await integrationsApi.startShopifyOAuth(shopDomain.trim());
     } catch (err: any) {
-      toast.error(err.message || "Failed to start Shopify connection.");
+      toast.error(err.message || t("errors.connectIntegration"));
       setConnecting(false);
     }
   }
 
   async function handleManualConnect() {
     if (!shopDomain.trim()) {
-      toast.error("Enter your Shopify store domain.");
+      toast.error(t("integrations.errorDomain"));
       return;
     }
     if (!accessToken.trim()) {
-      toast.error("Enter your Admin API access token.");
+      toast.error(t("integrations.errorToken"));
       return;
     }
     setSavingManual(true);
     try {
       await integrationsApi.connectShopify(shopDomain.trim(), accessToken.trim());
-      toast.success("Shopify connected successfully!");
+      toast.success(t("integrations.connected"));
       await loadIntegration();
       setAccessToken("");
       setShowManual(false);
     } catch (err: any) {
-      toast.error(err.message || "Failed to connect Shopify.");
+      toast.error(err.message || t("errors.connectIntegration"));
     } finally {
       setSavingManual(false);
     }
@@ -218,30 +218,30 @@ export default function IntegrationsPage() {
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showManual ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                Connect with API token instead
+                {t("integrations.connectManual")}
               </button>
 
               {showManual && (
                 <div className="rounded-md border border-border bg-muted/30 p-4 space-y-4">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">Connect using a custom app token</p>
+                    <p className="text-sm font-medium text-foreground">{t("integrations.manualTitle")}</p>
                     <p className="text-xs text-muted-foreground">
-                      Use this if the standard connect button doesn't work for your store.
+                      {t("integrations.manualDesc")}
                     </p>
                   </div>
 
                   {/* Step-by-step guide */}
                   <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                    <li>Go to your Shopify Admin → Settings → Apps and sales channels</li>
-                    <li>Click <strong className="text-foreground">Develop apps</strong> → <strong className="text-foreground">Create an app</strong></li>
-                    <li>Give it any name, then click <strong className="text-foreground">Configure Admin API scopes</strong></li>
-                    <li>Enable: <code className="bg-muted px-1 rounded">read_products</code>, <code className="bg-muted px-1 rounded">read_orders</code>, <code className="bg-muted px-1 rounded">read_customers</code></li>
-                    <li>Click <strong className="text-foreground">Save</strong> → then <strong className="text-foreground">Install app</strong></li>
-                    <li>Copy the <strong className="text-foreground">Admin API access token</strong> and paste it below</li>
+                    <li>{t("integrations.manualStep1")}</li>
+                    <li><div dangerouslySetInnerHTML={{ __html: t("integrations.manualStep2") }} className="inline" /></li>
+                    <li><div dangerouslySetInnerHTML={{ __html: t("integrations.manualStep3") }} className="inline" /></li>
+                    <li><div dangerouslySetInnerHTML={{ __html: t("integrations.manualStep4") }} className="inline" /></li>
+                    <li><div dangerouslySetInnerHTML={{ __html: t("integrations.manualStep5") }} className="inline" /></li>
+                    <li><div dangerouslySetInnerHTML={{ __html: t("integrations.manualStep6") }} className="inline" /></li>
                   </ol>
 
                   <div className="space-y-2">
-                    <Label htmlFor="accessToken">Admin API Access Token</Label>
+                    <Label htmlFor="accessToken">{t("integrations.accessToken")}</Label>
                     <Input
                       id="accessToken"
                       type="password"
@@ -261,7 +261,7 @@ export default function IntegrationsPage() {
                     ) : (
                       <Plug className="h-4 w-4" />
                     )}
-                    Save & Connect
+                    {t("integrations.saveAndConnect")}
                   </Button>
                 </div>
               )}

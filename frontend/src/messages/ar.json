@@ -310,19 +310,49 @@
     },
     "integrations": {
       "title": "التكاملات",
-      "description": "اربط الخدمات الخارجية التي يمكن لوكيل الذكاء الاصطناعي استخدامها.",
-      "storeUrl": "رابط متجر Shopify",
-      "accessToken": "رمز Admin API",
-      "tokenHint": "يتم تشفير الرمز أثناء التخزين ويظهر دائماً بشكل مخفي في لوحة التحكم.",
-      "connect": "ربط Shopify",
-      "update": "تحديث بيانات الربط",
-      "disconnect": "إلغاء الربط",
-      "connected": "تم حفظ تكامل Shopify.",
-      "disconnected": "تم إلغاء تكامل Shopify.",
-      "notConnected": "غير متصل",
-      "pending": "بانتظار التفعيل",
+      "description": "قم بتوصيل أدواتك المفضلة لتعزيز قدرات وكيلك.",
       "active": "نشط",
-      "pendingHelp": "تم حفظ بياناتك. يجب على المشرف تفعيل التكامل قبل أن يتمكن الذكاء الاصطناعي من استخدامه."
+      "pending": "قيد الانتظار",
+      "notConnected": "غير متصل",
+      "connect": "ربط المتجر",
+      "disconnect": "قطع الاتصال",
+      "storeUrl": "نطاق متجر Shopify",
+      "connected": "تم ربط Shopify بنجاح!",
+      "disconnected": "تم قطع اتصال Shopify.",
+      "tokenHint": "متجرك متصل بتطبيق Shopify الخاص بنا.",
+      "pendingHelp": "تكاملك قيد المراجعة وسيكون نشطًا قريبًا.",
+      "connectManual": "الاتصال باستخدام رمز API بدلاً من ذلك",
+      "manualTitle": "الاتصال باستخدام رمز تطبيق مخصص",
+      "manualDesc": "استخدم هذا إذا لم يعمل زر الاتصال القياسي لمتجرك.",
+      "manualStep1": "انتقل إلى Shopify Admin ← Settings ← Apps and sales channels",
+      "manualStep2": "انقر على <strong class=\"text-foreground\">Develop apps</strong> ← <strong class=\"text-foreground\">Create an app</strong>",
+      "manualStep3": "امنحه أي اسم، ثم انقر على <strong class=\"text-foreground\">Configure Admin API scopes</strong>",
+      "manualStep4": "قم بتفعيل: <code class=\"bg-muted px-1 rounded\">read_products</code>, <code class=\"bg-muted px-1 rounded\">read_orders</code>, <code class=\"bg-muted px-1 rounded\">read_customers</code>",
+      "manualStep5": "انقر على <strong class=\"text-foreground\">Save</strong> ← ثم <strong class=\"text-foreground\">Install app</strong>",
+      "manualStep6": "انسخ <strong class=\"text-foreground\">Admin API access token</strong> والصقه أدناه",
+      "accessToken": "Admin API Access Token",
+      "saveAndConnect": "حفظ وربط",
+      "errorDomain": "أدخل نطاق متجر Shopify الخاص بك.",
+      "errorToken": "أدخل رمز الوصول Admin API الخاص بك."
+    },
+    "shopify": {
+      "badge": "Shopify",
+      "titlePrefix": "تكامل",
+      "titleSuffix": "قوي",
+      "features": {
+        "orderTracking": {
+          "title": "تتبع الطلبات",
+          "description": "تحقق من حالة الطلبات في الوقت الفعلي لإبقاء عملائك على اطلاع دائم."
+        },
+        "orderConfirmation": {
+          "title": "تأكيد الطلب",
+          "description": "أرسل رسالة تأكيد تلقائيًا لعملائك بعد كل عملية شراء."
+        },
+        "productExpertise": {
+          "title": "خبرة المنتج",
+          "description": "يجيب الذكاء الاصطناعي على الفور على الأسئلة المتعلقة بمنتجاتك من خلال استخلاص المعلومات مباشرة من كتالوج Shopify الخاص بك."
+        }
+      }
     },
     "errors": {
       "loadAgent": "فشل تحميل تكوين الوكيل.",
