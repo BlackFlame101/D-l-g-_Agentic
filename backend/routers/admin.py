@@ -14,7 +14,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from core.logging import get_logger
-from core.security import CurrentUser, require_admin
+from core.security import CurrentUser, require_admin, get_current_user
 from schemas.admin import (
     AdminPlanOut,
     AdminStatsOut,
