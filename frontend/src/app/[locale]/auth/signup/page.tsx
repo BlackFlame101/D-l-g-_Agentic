@@ -16,6 +16,7 @@ import {
   User,
   Phone,
   Globe,
+  Building2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -24,6 +25,7 @@ export default function SignupPage() {
   const locale = useLocale();
   const router = useRouter();
   const [fullName, setFullName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
@@ -58,6 +60,7 @@ export default function SignupPage() {
       options: {
         data: {
           full_name: fullName,
+          company_name: companyName,
           phone,
           website: website || undefined,
         },
@@ -121,6 +124,21 @@ export default function SignupPage() {
                 placeholder={t("fullNamePlaceholder")}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                className="ps-10"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="companyName">{t("companyName")}</Label>
+            <div className="relative">
+              <Building2 className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="companyName"
+                placeholder={t("companyNamePlaceholder")}
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
                 className="ps-10"
                 required
               />

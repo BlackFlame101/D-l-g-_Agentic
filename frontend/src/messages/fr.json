@@ -107,6 +107,8 @@
     "fullName": "Nom complet",
     "fullNamePlaceholder": "Jean Dupont",
     "whatsappNumber": "Numéro WhatsApp",
+    "companyName": "Nom de l'entreprise",
+    "companyNamePlaceholder": "Mon Entreprise",
     "website": "Site web",
     "optional": "Optionnel",
     "forgotPassword": "Mot de passe oublié ?",

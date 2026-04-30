@@ -107,6 +107,8 @@
     "fullName": "Full Name",
     "fullNamePlaceholder": "John Doe",
     "whatsappNumber": "WhatsApp Number",
+    "companyName": "Company Name",
+    "companyNamePlaceholder": "My Business",
     "website": "Website",
     "optional": "Optional",
     "forgotPassword": "Forgot password?",
