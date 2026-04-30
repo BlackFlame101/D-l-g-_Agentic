@@ -15,6 +15,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 import {
   Tooltip,
   TooltipContent,
@@ -56,11 +57,23 @@ export function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
       )}
     >
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-destructive font-heading text-sm font-bold text-destructive-foreground">
-          <ShieldCheck className="h-4 w-4" />
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
+        {collapsed ? (
+          <Image
+            src="/favicon.png"
+            alt="D"
+            width={32}
+            height={32}
+            className="h-8 w-8 shrink-0 object-contain"
+          />
+        ) : (
+          <div className="flex items-center gap-2 overflow-hidden">
+            <Image
+              src="/favicon.png"
+              alt="D"
+              width={24}
+              height={24}
+              className="h-6 w-6 shrink-0 object-contain"
+            />
             <p className="truncate font-heading text-base font-bold text-sidebar-foreground">
               {t("title")}
             </p>

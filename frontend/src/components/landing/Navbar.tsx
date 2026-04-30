@@ -7,6 +7,7 @@ import { Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 
 function ShopifyIcon({ className }: { className?: string }) {
   return (
@@ -64,9 +65,16 @@ export function Navbar() {
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <a href="#" className="text-xl font-bold text-foreground">
-          Délégué
-        </a>
+        <Link href={`/${locale}`} className="flex items-center gap-2">
+          <Image
+            src="/logo.png"
+            alt="Déléguè"
+            width={120}
+            height={40}
+            className="h-10 w-auto object-contain"
+            priority
+          />
+        </Link>
 
         {/* Desktop nav */}
         <div className="hidden items-center gap-8 md:flex">

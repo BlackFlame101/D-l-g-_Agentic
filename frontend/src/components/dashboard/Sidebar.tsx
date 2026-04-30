@@ -21,6 +21,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 import {
   Tooltip,
   TooltipContent,
@@ -93,15 +94,22 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     >
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary font-heading text-sm font-bold text-primary-foreground">
-          D
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
-            <p className="truncate font-heading text-base font-bold text-sidebar-foreground">
-              Déléguè
-            </p>
-          </div>
+        {collapsed ? (
+          <Image
+            src="/favicon.png"
+            alt="D"
+            width={32}
+            height={32}
+            className="h-8 w-8 shrink-0 object-contain"
+          />
+        ) : (
+          <Image
+            src="/logo.png"
+            alt="Déléguè"
+            width={160}
+            height={40}
+            className="h-10 w-auto object-contain"
+          />
         )}
       </div>
 
